@@ -35,6 +35,8 @@ Follow these steps in order. Stop where a step says STOP.
 - Build exactly what the plan describes. If something in the plan turns out to be wrong or impossible, STOP and explain. Do not improvise around it.
 - Follow CLAUDE.md and the shared policy it imports. Follow the project's architecture and feature cycle as CLAUDE.md describes them.
 - Write tests as you go that prove the change works. Use /tdd where it fits: write a failing test first, then make it pass.
+- Build the plan's "Planned tests" for its requirements. A test built differently from the plan is a deviation (step 9).
+- When the change edits a file outside the repository (so git can't show the edit), before editing it save a copy of the original on the branch as `docs/reviews/<NUMBER>-<file name>-before.md`, unchanged, and commit it with the records in step 9.
 - Commit work in progress on the branch as you go, with messages that start with the plan's type and number, for example `feat(ABC-085): add status table`. Nothing goes to the default branch in this step.
 - Write migration scripts when the plan calls for them, but never run anything against files in `data/` unless the user's current message explicitly asks. If they do, back up the database first.
 
@@ -44,7 +46,7 @@ All of the checks listed under "Checks (all must pass)" in CLAUDE.md must pass b
 If something fails, fix it and re-run. If you can't fix it, STOP and report in plain English.
 
 ## 6. Review
-- Run /code-review on the diff between this branch and the default branch.
+- Run /code-review on the diff between this branch and the default branch. If the change edited a file outside the repository, the review scope also includes a before/after comparison of that file against its saved copy.
 - Present EVERY finding: severity (`[Informational]`, `[Nit]`, `[Low]`, `[Medium]`, `[High]`), a one-line plain-English description, and the files involved.
 - Every finding ends in one of three places: fixed, explained (wrong, by design, or a pure observation, with the reason), or logged in KNOWN_ISSUES.md. Nothing is left unaccounted for.
 - If a proposed fix would go against the approved plan, mark it in the findings list with the plan's exact words before the user decides, and never act against the plan without asking.
@@ -54,6 +56,11 @@ If something fails, fix it and re-run. If you can't fix it, STOP and report in p
 - Fix only the findings the user approved.
 - Run every check from step 5 again. All must pass.
 - Note each finding and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding the user decides to log.
+
+- Work out each requirement's result for the trace table in step 9:
+  - Automated test: run it and record Pass or Fail. A Fail is a finding and goes through the review flow.
+  - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)".
+  - Manual check that needs the user at the app: record "Manual".
 
 ## 8. Confirm the plan is untouched
 - Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
@@ -73,11 +80,16 @@ If the plan itself is a documentation change (for example rewriting, moving, arc
 - **Plan:** docs/plans/<plan file name> (approved in commit <short hash of the plan commit>)
 - **Branch:** <branch name>
 - **Reviewer:** <who/what performed the review>
-- **Scope:** diff of <branch> against <default branch> — <files changed>, about <N> lines
+- **Scope:** diff of <branch> against <default branch> — <files changed>, about <N> lines (plus any file outside the repository that the change edited, with its saved copy)
 
 ## Findings
 - **[Severity]** <one-line description> — <files>
   **Disposition:** fixed (how) | explained (why) | logged in KNOWN_ISSUES.md
+
+## Requirements trace
+| Requirement | Test | Result |
+|---|---|---|
+| R1 | <the test, as in the plan or as built> | Pass \| Fail \| Pass (checked by Claude) \| Fail (checked by Claude) \| Manual |
 
 ## Deviations from the plan
 <Anything built differently from the approved plan, and why. "None" if none.>
@@ -106,7 +118,7 @@ Do not add new entries to `docs/archive/PEER_REVIEW.md`; it is the archive of ol
 Tell the user in plain English:
 - The change number, what was built, and what was fixed after review.
 - Which documents you created or changed, and why, so they can read them before checking in.
-- What to test by hand, using the "How you'll check it" steps from the plan.
+- What to test by hand: list every numbered test (T1, T2, …) from the plan's "How you'll check it", in full, and next to each one show the trace-table results of the requirements it covers, so the user can see which ones Claude already checked.
 - Whether there is a new migration. If so, remind them to Export All (and back up the database file) before running it, and that the app won't start against the database until it's run.
 - That when they're satisfied, they type `/commit-change`.
 
