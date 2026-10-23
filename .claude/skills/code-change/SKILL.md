@@ -56,10 +56,9 @@ If something fails, fix it and re-run. If you can't fix it, STOP and report in p
 - Fix only the findings the user approved.
 - Run every check from step 5 again. All must pass.
 - Note each finding and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding the user decides to log.
-
 - Work out each requirement's result for the trace table in step 9:
-  - Automated test: run it and record Pass or Fail. A Fail is a finding and goes through the review flow.
-  - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)".
+  - Automated test: run it and record Pass or Fail. A Fail is a new finding: show it to the user as in step 6 and STOP until they decide, before continuing.
+  - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)". A Fail is handled the same way as an automated Fail.
   - Manual check that needs the user at the app: record "Manual".
 
 ## 8. Confirm the plan is untouched
