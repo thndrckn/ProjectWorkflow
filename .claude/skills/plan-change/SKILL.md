@@ -37,8 +37,9 @@ Use the grilling skill, with these rules:
 - Keep going until nothing important is unresolved.
 
 ## 4. Play it back
-Sum up the shared understanding in a few plain-English sentences and ask: "Is that right?"
-Wait for a yes. If the user corrects anything, fix your understanding and play it back again.
+Draft the requirements from the interview. Every plan has at least one requirement, whatever its type. Each is a numbered Given / When / Then case (R1, R2, …) in plain English that can be checked on its own.
+Sum up the shared understanding in a few plain-English sentences, list the proposed requirements, and ask: "Is that right?"
+Wait for a yes. A yes covers the requirements too. If the user corrects anything, including a requirement, fix your understanding and play it back again.
 
 ## 5. Write the plan file
 Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated.
@@ -54,6 +55,10 @@ Use exactly this format. The top sections are for the user: plain English, no co
 ## What you'll see change
 <What's different in the app, from the user's point of view.>
 
+## Requirements
+- **R1.** Given <starting situation>, when <something happens>, then <what must be true>.
+- **R2.** Given …, when …, then ….
+
 ## What could go wrong / what gets lost
 <Data loss, migrations to run by hand, risky changes. Always present. Write "Nothing" if so.>
 
@@ -61,7 +66,14 @@ Use exactly this format. The top sections are for the user: plain English, no co
 <What this plan deliberately doesn't do.>
 
 ## How you'll check it
-<Manual steps the user can follow to confirm it works.>
+<The user's manual test procedure: a numbered list of tests. Every requirement is covered by at least one test.>
+
+**T1 — <name>. Covers R1, R2.**
+
+1. <Step the user does.>
+2. <Next step.>
+
+Expected: <what the user should see.>
 
 ## Check-in
 - Type: feat | fix | refactor | perf | style | docs | chore | test
@@ -73,9 +85,14 @@ Use exactly this format. The top sections are for the user: plain English, no co
 ## Technical detail (for Claude)
 <Files, layers (Rust vs frontend) and why, functions to reuse, migration contents,
 tests to add, the CLAUDE.md feature cycle steps that apply.>
+
+**Planned tests**
+- R1 — <Automated | Manual>: <the test>. <For a manual one: why it isn't automated, and whether Claude can run it itself (read a file, run a command) or it needs the user at the app.>
 ```
 
 Rules for the plan:
+- Every requirement has a planned test in "Planned tests". A test is automated wherever one can exist (Rust, frontend logic). A manual check is named and says why.
+- Requirements are plain English, with no code or file paths, like the other top sections.
 - Follow the project's architecture: business logic in Rust, the full feature cycle, lookup tables, numbered migrations.
 - If any section would be long, the change is probably too big. Say so and suggest splitting it into separate changes, each with its own number.
 
