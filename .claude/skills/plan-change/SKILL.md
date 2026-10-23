@@ -22,15 +22,15 @@ Never skip the interview or the play-back. If the request already answers everyt
 - If the request is a bug report, find the actual root cause first using the diagnosing-bugs skill, then plan the fix.
 
 ## 2. Assign the change number
-- The change prefix is set in CLAUDE.md (for example `Change prefix: DTP`). If CLAUDE.md doesn't set one, ask the user and STOP until they answer.
-- Find the highest existing number for that prefix (for example `DTP-084`) in both `CHANGELOG.md` and the file names in `docs/plans/`. The new change gets the next number, written with three digits (`DTP-085`).
+- The change prefix is set in the Workflow section of CLAUDE.md. If CLAUDE.md doesn't set one, ask the user and STOP until they answer.
+- Find the highest existing number for that prefix (for example `ABC-084`) in both `CHANGELOG.md` and the file names in `docs/plans/`. The new change gets the next number, written with three digits (`ABC-085`).
 - If no numbers exist yet in either place, do not guess. Ask the user which number to use and STOP until they answer.
-- Tell the user the number in one line, for example: "This change is DTP-085."
+- Tell the user the number in one line, for example: "This change is ABC-085."
 
 ## 3. Interview the user
 Use the grilling skill, with these rules:
-- Ask exactly ONE question per message. Never batch questions, and never use a multiple-choice question tool that shows several questions at once.
-- Give a recommended answer with every question.
+- Ask exactly ONE question per message. Never batch questions.
+- Ask every question using the question box (the AskUserQuestion tool): one question per box, never several questions in one box. Put the recommended answer first in the options and label it "(Recommended)".
 - Wait for the user's reply before asking the next question.
 - Only ask about real decisions: what it should do, edge cases, trade-offs. Never ask about facts you can look up.
 - Ask about anything risky as its own question: schema changes, migrations, data that could be lost or changed, anything touching import/export or deletes.
@@ -41,7 +41,7 @@ Sum up the shared understanding in a few plain-English sentences and ask: "Is th
 Wait for a yes. If the user corrects anything, fix your understanding and play it back again.
 
 ## 5. Write the plan file
-Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/DTP-085-docs-cleanup.md`. The short title is lowercase and hyphenated.
+Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated.
 
 Use exactly this format. The top sections are for the user: plain English, no code, SQL, or file paths.
 
