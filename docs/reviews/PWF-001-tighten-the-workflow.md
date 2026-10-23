@@ -10,7 +10,7 @@
 - **[Medium]** Hook commands used a relative path, so they silently did nothing when the session started outside the repo root — `.claude/settings.json`
   **Disposition:** fixed. Hooks now run from `$CLAUDE_PROJECT_DIR`, and `block-main-edits.sh` reads the branch from that folder.
 - **[Low]** `rename-plan.sh` and `plansDirectory` were dead once plan mode was blocked — `.claude/hooks/rename-plan.sh`, `.claude/settings.json`
-  **Disposition:** fixed, by deleting the hook, its `ExitPlanMode` entry, and `plansDirectory`. This reverses the plan's "keep as they are" (see Deviations).
+  **Disposition:** declined, because the fix (deleting them) contradicts the approved plan, which says to keep both. Logged in `KNOWN_ISSUES.md` instead. The files were first deleted in error and then restored (see Deviations).
 - **[Medium]** No defined way to cut a release, and the saved "ask version bump before commit" note now conflicted — `.claude/skills/code-change/SKILL.md`, `.claude/skills/commit-change/SKILL.md`
   **Disposition:** fixed for the conflict: the saved note is rewritten to say bumps and tags no longer happen at check-in. `/build-changes` itself is deliberately still unwritten, as the plan said.
 - **[Low]** The master guard matched any path containing `docs/plans/`, read the first `file_path` in raw text, and `.claude/` was no longer exempt — `.claude/hooks/block-main-edits.sh`
@@ -29,7 +29,7 @@
   **Disposition:** fixed. Step 2 now says the skill is meant to run from `master` and that the list should mention it if the current branch isn't.
 
 ## Deviations from the plan
-- Deleted `rename-plan.sh`, its `ExitPlanMode` hook entry, and `plansDirectory` (finding 2). The plan said to keep them; the user chose "all 10" findings, so the deletion was applied. Restoring them is a `git revert` away.
+- **Deviation, then reversed:** in commit cd78240, Claude deleted `rename-plan.sh`, its `ExitPlanMode` hook entry, and `plansDirectory` (finding 2), although the plan said to keep them. That was wrong: a review finding does not authorize going against the plan, and Claude should have stopped and asked. The user caught it, and the files were restored in the next commit, with `rename-plan.sh` byte-for-byte identical to its version in commit c9ed7b8 (the DTP-naming version from DTP-085, which is the only place it exists in git). The settings entries are back as they were. The net result against `master` is no deviation for this item. Claude's saved feedback notes now say to stop and ask in this situation.
 - `.gitignore` keeps `.claude/*` with exceptions for the skills, hooks and `settings.json`, instead of ignoring only `settings.local.json` (finding 6).
 - The master guard now also fails closed if the branch can't be read, and uses `node` to parse the hook input (findings 4 and 5).
 - `KNOWN_ISSUES.md` gained an entry for the uncovered Bash edits; the plan did not list that file.
@@ -37,4 +37,4 @@
 - The saved note `feedback_version_bump_before_commit.md` was rewritten alongside `feedback_plan_approval_gate.md`; both are outside the repo and not in the commit.
 
 ## Summary
-All ten review findings were fixed. The workflow no longer bumps versions or tags, `.claude/` skills, hooks and `settings.json` are tracked, plan mode is blocked, `/plan-change` can't skip the interview or play-back and opens the plan in the editor, and `/code-change` and `/commit-change` stop in the places the user asked for. Rust tests (384), clippy, fmt, lint and the Vite build pass; nothing in the app or `data/` was touched.
+Nine of the ten review findings were fixed; finding 2 was declined because it contradicts the plan, and is logged in `KNOWN_ISSUES.md`. The workflow no longer bumps versions or tags, `.claude/` skills, hooks and `settings.json` are tracked, plan mode is blocked, `/plan-change` can't skip the interview or play-back and opens the plan in the editor, and `/code-change` and `/commit-change` stop in the places the user asked for. Rust tests (384), clippy, fmt, lint and the Vite build pass; nothing in the app or `data/` was touched.
