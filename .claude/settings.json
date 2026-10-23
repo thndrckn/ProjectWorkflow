@@ -1,25 +1,16 @@
 {
-  "plansDirectory": "./docs/plans",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/block-main-edits.sh" }
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-main-edits.sh\"" }
         ]
       },
       {
         "matcher": "EnterPlanMode",
         "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/block-plan-mode.sh" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/rename-plan.sh" }
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-plan-mode.sh\"" }
         ]
       }
     ]

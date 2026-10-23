@@ -20,14 +20,14 @@ Follow these steps in order. Stop where a step says STOP.
 
 ## 2. Check for other branches
 - Run `git branch` on its own, as a separate command, before anything else in this step. Never combine it with creating or switching a branch.
-- If any branch other than `master` exists, list them in plain English and explain that the new branch will start from `master`, so it won't include any work on those branches.
+- If any branch other than `master` exists, list them in plain English and explain that the new branch will start from `master`, so it won't include any work on those branches. `/code-change` is meant to be run from `master`; if the current branch is not `master`, say so as part of the list.
 - Ask whether to continue, or to deal with one of those branches first. STOP until they answer.
 
 ## 3. Make the working copy
 - Run `git status` on its own, as a separate command, before switching or creating any branch. Never combine it with anything else. Check for uncommitted changes, other than the new plan file.
   - If the plan says this change is the user's own existing edits, those edits are expected. Leave them in place; creating the branch below carries them onto it.
   - Any other uncommitted changes: show them and STOP until the user answers.
-- Switch to `master` and update it from GitHub.
+- Switch to `master` and update it from GitHub with `git pull --ff-only`. If it can't fast-forward, STOP and tell the user in plain English.
 - From `master`, create the branch named in the plan's Check-in section.
 - Commit the plan file as the first commit on the branch, with the message `docs(<NUMBER>): approved plan`. From here on, the plan file is frozen.
 
@@ -39,10 +39,10 @@ Follow these steps in order. Stop where a step says STOP.
 - Write migration scripts when the plan calls for them, but never run anything against files in `data/` unless the user's current message explicitly asks. If they do, back up the database first.
 
 ## 5. Run the checks
-All of these must pass before review:
-- `cd src-tauri && cargo test`
-- `cargo clippy --all-targets -- -D warnings`
-- `cargo fmt --check`
+All of these must pass before review. Run each one from the repo root as its own command; the shell's directory persists between commands, so never `cd` into `src-tauri` without a subshell or `--manifest-path`:
+- `cargo test --manifest-path src-tauri/Cargo.toml`
+- `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
+- `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
 - `npm run lint`
 - `npm run build:vite`
 - `npm run test:pdf` if anything touching the itinerary or PDF changed

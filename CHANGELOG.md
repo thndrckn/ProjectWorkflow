@@ -6,7 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
-- PWF-001 (chore) Tightened the workflow: no versions or tags at check-in, `.claude` tracked in git, plan mode blocked, stricter branch checks, no skipping the interview or play-back.
+- PWF-001 (chore) Tightened the workflow: no versions or tags at check-in, `.claude` tracked in git, plan mode blocked, stricter branch checks, no skipping the interview or play-back. Also relabelled DTP-068 from (fix) to (feat).
 - DTP-085 (docs) Numbered the changelog, split the review log into per-change records, moved the plans into `docs/`, and removed GENERATED_SPEC.md.
 - DTP-084 (docs) Recorded where v0.40.0 differs from its approved park-hours plan.
 

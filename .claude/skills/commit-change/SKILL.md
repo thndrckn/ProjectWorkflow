@@ -35,9 +35,9 @@ Tell the user in one line what's about to happen, for example:
 > "Checking in DTP-085, per the plan."
 
 ## 4. Merge and publish
-- Switch to `master` and merge with `git merge --no-ff <branch>`, using the plan's commit message for the merge commit.
-- Push `master` to GitHub.
-- Delete the working branch.
+- Switch to `master` and merge with `git merge --no-ff <branch>`, using the plan's commit message for the merge commit. If the merge reports a conflict, run `git merge --abort`, STOP, and tell the user in plain English. Do not push or delete anything.
+- Push `master` to GitHub. If the push is rejected, STOP and tell the user in plain English. Do not delete the branch, and do not force-push; say that local `master` is ahead of GitHub.
+- Only after the push succeeds, delete the working branch with `git branch -d <branch>` (never `-D`).
 
 ## 5. Report
 Tell the user in plain English:
