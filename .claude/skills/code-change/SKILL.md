@@ -64,7 +64,7 @@ Settle every finding yourself. Do not stop to ask the user which to fix. Stop on
 - Every finding ends in one of three places: **fixed**, **explained** (wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. A `[Medium]` or `[High]` finding can only be fixed or explained, never logged. Nothing is left unaccounted for.
 - Never change a reviewer's severity. If you think it's wrong, say so in the finding's disposition and keep the severity.
 - **Stop case 1, plan conflict:** if a fix would go against the approved plan, quote the plan's exact words, STOP and ask the user before acting.
-- **Stop case 2, data risk:** if a fix would edit a migration script, code that deletes user data (database rows or files), import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan and whatever the finding's severity. If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, the same applies.
+- **Stop case 2, data risk:** if a fix would edit a migration script, delete behaviour, import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan and whatever the finding's severity. If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, the same applies.
 - When a stop case applies, record the question and the user's answer in the finding's disposition in the review record.
 - Work out each requirement's result for the trace table in step 9:
   - Automated test: run it and record Pass or Fail.
