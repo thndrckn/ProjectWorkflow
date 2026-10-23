@@ -2,8 +2,8 @@
 # .claude/hooks/rename-plan.sh
 # Silently renames the plan file after ExitPlanMode approval,
 # using the plan's first `#` heading. A heading that starts with a change number
-# (e.g. `# DTP-085 — Title`) becomes `DTP-085-title.md`; any other heading becomes
-# `YYYY-MM-DD-title.md`. A file already named `DTP-###-*.md` is left alone.
+# (any prefix, e.g. `# TD-001 — Title`) becomes `TD-001-title.md`; any other heading becomes
+# `YYYY-MM-DD-title.md`. A file already named `<PREFIX>-###-*.md` is left alone.
 
 INPUT=$(cat)
 
@@ -23,15 +23,15 @@ if [[ -z "$TITLE" ]]; then
 fi
 
 case "$(basename "$FILE_PATH")" in
-  DTP-[0-9][0-9][0-9]-*) exit 0 ;;
+  [A-Z]*-[0-9][0-9][0-9]-*) exit 0 ;;
 esac
 
 SLUG=$(echo "$TITLE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')
 DATE=$(date +%Y-%m-%d)
 DIR=$(dirname "$FILE_PATH")
-if echo "$TITLE" | grep -qE '^DTP-[0-9]{3}'; then
-  NUM=$(echo "$TITLE" | grep -oE '^DTP-[0-9]{3}')
-  REST=$(echo "$SLUG" | sed -E 's/^dtp-[0-9]{3}-?//')
+if echo "$TITLE" | grep -qE '^[A-Z]+-[0-9]{3}'; then
+  NUM=$(echo "$TITLE" | grep -oE '^[A-Z]+-[0-9]{3}')
+  REST=$(echo "$SLUG" | sed -E 's/^[a-z]+-[0-9]{3}-?//')
   NEW_PATH="$DIR/$NUM-$REST.md"
   if [[ -z "$REST" ]]; then NEW_PATH="$DIR/$NUM.md"; fi
 else

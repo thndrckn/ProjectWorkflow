@@ -40,7 +40,7 @@ branch=$(git -C "$proj" rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 # An unreadable branch fails closed, same as being on master.
 if [ -z "$branch" ] || [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
-  echo "BLOCKED: You are on '${branch:-an unknown branch}'. Create a feature branch from master first (git switch -c <type>/<short-description>) before editing any files. Never edit on master." >&2
+  echo "BLOCKED: You are on '${branch:-an unknown branch}'. Create a feature branch from the default branch first (git switch -c <type>/<short-description>) before editing any files. Never edit on the default branch." >&2
   exit 2
 fi
 
