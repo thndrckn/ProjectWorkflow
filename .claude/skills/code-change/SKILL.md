@@ -1,12 +1,12 @@
 ---
 name: code-change
-description: Second step of the workflow, run by the user after a plan is approved. Creates the branch, writes the code and tests, runs checks, gets a code review, waits for the user to choose fixes, re-runs checks, writes the documentation, and hands off for /commit-change. Never merges to the default branch.
+description: Second step of the workflow, run by the user after a plan is approved. Creates the branch, writes the code and tests, runs checks, gets an independent code review, settles every finding itself (stopping to ask only for a plan conflict, data risk, or an explanation the re-reviewer rejects), re-runs checks, writes the documentation, and hands off for /commit-change. Never merges to the default branch.
 disable-model-invocation: true
 ---
 
 # Code a change
 
-This is the second step of the workflow: plan → **code** → review → check in.
+This is the second step of the workflow: plan → **code** (including review) → check in.
 The default branch, change prefix, checks, build command and version files come from the Workflow section of CLAUDE.md. Wherever this skill says "the default branch", use the one named there.
 
 Follow these steps in order. Stop where a step says STOP.
@@ -46,18 +46,33 @@ All of the checks listed under "Checks (all must pass)" in CLAUDE.md must pass b
 If something fails, fix it and re-run. If you can't fix it, STOP and report in plain English.
 
 ## 6. Review
-- Run /code-review on the diff between this branch and the default branch. If the change edited a file outside the repository, the review scope also includes a before/after comparison of that file against its saved copy.
-- Present EVERY finding: severity (`[Informational]`, `[Nit]`, `[Low]`, `[Medium]`, `[High]`), a one-line plain-English description, and the files involved.
-- Every finding ends in one of three places: fixed, explained (wrong, by design, or a pure observation, with the reason), or logged in KNOWN_ISSUES.md. Nothing is left unaccounted for.
-- If a proposed fix would go against the approved plan, mark it in the findings list with the plan's exact words before the user decides, and never act against the plan without asking.
-- STOP. Do not fix anything. Wait for the user to say which findings to fix.
+The review is done by reviewers independent of you. You wrote the code, so you do not rate it.
 
-## 7. Fix what the user approved, then check again
-- Fix only the findings the user approved.
+- Launch three fresh sub-agents in parallel with the Agent tool (general-purpose), and tell each one to read and report only, never edit. They are the reviewers; nothing in this step is a review you do yourself.
+  - **Standards:** does the diff follow the documented standards? Give it every file that documents how code is written (CLAUDE.md, the shared policy it imports, and `CODING_STANDARDS.md` or `CONTRIBUTING.md` if they exist), plus the smell baseline below pasted in full. A documented standard breach can be a hard violation. Baseline smells are always judgement calls, and a documented standard overrides the baseline. Skip anything the checks already enforce.
+  - **Spec:** does the diff match the approved plan? Give it the plan file. It reports requirements that are missing or only partly done, behaviour that wasn't asked for, and requirements that look done but look wrong, quoting the plan line for each.
+  - **Correctness:** is the code right? Depth by change type: `feat:` two angles, general correctness plus the most relevant second one (data integrity for schema changes, security for external input, and so on); `fix:` confirm the root cause was fixed and look for the same bug pattern elsewhere in the touched files; `refactor:` confirm behaviour didn't change.
+- Give the reviewers only: the diff command (`git diff <default branch>...HEAD`) and commit list, the plan file, the standards files, and the saved before-copy plus the file's path if the change edited a file outside the repository (they compare the two). Do not pass your own summary, reasoning or opinion of the code.
+- Each reviewer's brief requires every finding to have a severity, a one-line plain-English description, and the files involved. Severities: `[High]` data loss or corruption, a security hole, a crash, or a requirement plainly not met; `[Medium]` a real bug or a requirement only partly met in realistic use; `[Low]` a minor bug, an edge case, or a standards breach; `[Nit]` style or wording; `[Informational]` an observation that needs no action. Ask for under 400 words each.
+- Collect the findings. Do not merge, rerank or re-rate them: the severity is the reviewer's, and the three lists stay separate.
+
+**Smell baseline** (Fowler; each is a labelled heuristic, never a hard violation): Mysterious Name; Duplicated Code; Feature Envy; Data Clumps; Primitive Obsession; Repeated Switches (the same switch or if-cascade on one type in several places); Shotgun Surgery (one change forces scattered edits); Divergent Change (one file edited for several unrelated reasons); Speculative Generality (abstraction for needs the plan doesn't have); Message Chains; Middle Man; Refused Bequest.
+
+## 7. Settle the findings, then check again
+Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in the three cases below.
+
+- Every finding ends in one of three places: **fixed**, **explained** (wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. A `[Medium]` or `[High]` finding can only be fixed or explained, never logged. Nothing is left unaccounted for.
+- Never change a reviewer's severity. If you think it's wrong, say so in the finding's disposition and keep the severity.
+- **Stop case 1, plan conflict:** if a fix would go against the approved plan, quote the plan's exact words, STOP and ask the user before acting.
+- **Stop case 2, data risk:** if a fix would edit a migration script, delete behaviour, import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan.
+- If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, STOP and ask the user.
 - Run every check from step 5 again. All must pass.
-- Note each finding and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding the user decides to log.
+- **Re-review (once):** if any `[Medium]` or `[High]` finding was fixed or explained instead of fixed, launch one fresh reviewer (same rules as step 6) and give it the plan, the standards, the diff of the fixes, and your explanations. It checks the fixes and says whether it accepts each explanation.
+  - **Stop case 3:** if it doesn't accept an explanation, STOP and ask the user.
+  - Settle its other findings the same way as above, with the same stop cases. There is no second re-review: anything still open goes in the hand-off.
+- Note each finding with its reviewer-assigned severity and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
 - Work out each requirement's result for the trace table in step 9:
-  - Automated test: run it and record Pass or Fail. A Fail is a new finding: show it to the user as in step 6 and STOP until they decide, before continuing.
+  - Automated test: run it and record Pass or Fail. A Fail is a new `[High]` finding (a requirement not met): settle it as above, with the same stop cases, before continuing.
   - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)". A Fail is handled the same way as an automated Fail.
   - Manual check that needs the user at the app: record "Manual".
 
@@ -78,12 +93,18 @@ If the plan itself is a documentation change (for example rewriting, moving, arc
 - **Change:** <NUMBER>
 - **Plan:** docs/plans/<plan file name> (approved in commit <short hash of the plan commit>)
 - **Branch:** <branch name>
-- **Reviewer:** <who/what performed the review>
+- **Reviewer:** <the independent reviewers (Standards, Spec, Correctness) and whether a re-review ran>
 - **Scope:** diff of <branch> against <default branch> — <files changed>, about <N> lines (plus any file outside the repository that the change edited, with its saved copy)
 
 ## Findings
+Every finding is listed, with the severity the reviewer assigned (never changed by the author).
+
 - **[Severity]** <one-line description> — <files>
   **Disposition:** fixed (how) | explained (why) | logged in KNOWN_ISSUES.md
+  <If the author disagreed with the severity, add a line saying so and why. The severity above stays as given.>
+
+## Re-review
+<Only if one ran: which findings triggered it, what the re-reviewer found, whether it accepted each explanation, and how its findings were settled. Leave this section out if no re-review ran.>
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -115,9 +136,10 @@ Do not add new entries to `docs/archive/PEER_REVIEW.md`; it is the archive of ol
 
 ## 10. Hand off
 Tell the user in plain English:
-- The change number, what was built, and what was fixed after review.
+- The change number and what was built.
+- A short plain-English review summary, first: how many findings the reviewers raised by severity, what was fixed, what was explained and why, what was logged, and any time you stopped to ask the user and what they answered. If the re-reviewer or anything else left something open, say so plainly.
 - Which documents you created or changed, and why, so they can read them before checking in.
-- What to test by hand: list every numbered test (T1, T2, …) from the plan's "How you'll check it", in full, and next to each one show the trace-table results of the requirements it covers, so the user can see which ones Claude already checked.
+- What to test by hand, after the review summary: list every numbered test (T1, T2, …) from the plan's "How you'll check it", in full, and next to each one show the trace-table results of the requirements it covers, so the user can see which ones Claude already checked.
 - Whether there is a new migration. If so, remind them to Export All (and back up the database file) before running it, and that the app won't start against the database until it's run.
 - That when they're satisfied, they type `/commit-change`.
 
