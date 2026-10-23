@@ -52,29 +52,30 @@ The review is done by reviewers independent of you. You wrote the code, so you d
   - **Standards:** does the diff follow the documented standards? Give it every file that documents how code is written (CLAUDE.md, the shared policy it imports, and `CODING_STANDARDS.md` or `CONTRIBUTING.md` if they exist), plus the smell baseline below pasted in full. A documented standard breach can be a hard violation. Baseline smells are always judgement calls, and a documented standard overrides the baseline. Skip anything the checks already enforce.
   - **Spec:** does the diff match the approved plan? Give it the plan file. It reports requirements that are missing or only partly done, behaviour that wasn't asked for, and requirements that look done but look wrong, quoting the plan line for each.
   - **Correctness:** is the code right? Depth by change type: `feat:` two angles, general correctness plus the most relevant second one (data integrity for schema changes, security for external input, and so on); `fix:` confirm the root cause was fixed and look for the same bug pattern elsewhere in the touched files; `refactor:` confirm behaviour didn't change.
-- Give the reviewers only: the diff command (`git diff <default branch>...HEAD`) and commit list, the plan file, the standards files, and the saved before-copy plus the file's path if the change edited a file outside the repository (they compare the two). Do not pass your own summary, reasoning or opinion of the code.
+- Give each reviewer only the inputs for its own job, from this list: the diff command (`git diff <default branch>...HEAD`) and commit list, the plan file (Spec and Correctness), the standards files (Standards), and the saved before-copy plus the file's path if the change edited a file outside the repository (they compare the two). Do not pass your own summary, reasoning or opinion of the code.
 - Each reviewer's brief requires every finding to have a severity, a one-line plain-English description, and the files involved. Severities: `[High]` data loss or corruption, a security hole, a crash, or a requirement plainly not met; `[Medium]` a real bug or a requirement only partly met in realistic use; `[Low]` a minor bug, an edge case, or a standards breach; `[Nit]` style or wording; `[Informational]` an observation that needs no action. Ask for under 400 words each.
 - Collect the findings. Do not merge, rerank or re-rate them: the severity is the reviewer's, and the three lists stay separate.
 
 **Smell baseline** (Fowler; each is a labelled heuristic, never a hard violation): Mysterious Name; Duplicated Code; Feature Envy; Data Clumps; Primitive Obsession; Repeated Switches (the same switch or if-cascade on one type in several places); Shotgun Surgery (one change forces scattered edits); Divergent Change (one file edited for several unrelated reasons); Speculative Generality (abstraction for needs the plan doesn't have); Message Chains; Middle Man; Refused Bequest.
 
-## 7. Settle the findings, then check again
-Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in the three cases below.
+## 7. Settle the findings, check again, re-review
+Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in these three cases, each described below: (1) a fix would go against the approved plan, (2) a fix would touch the user's data, (3) the re-reviewer rejects an explanation.
 
 - Every finding ends in one of three places: **fixed**, **explained** (wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. A `[Medium]` or `[High]` finding can only be fixed or explained, never logged. Nothing is left unaccounted for.
 - Never change a reviewer's severity. If you think it's wrong, say so in the finding's disposition and keep the severity.
 - **Stop case 1, plan conflict:** if a fix would go against the approved plan, quote the plan's exact words, STOP and ask the user before acting.
-- **Stop case 2, data risk:** if a fix would edit a migration script, delete behaviour, import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan.
-- If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, STOP and ask the user.
-- Run every check from step 5 again. All must pass.
-- **Re-review (once):** if any `[Medium]` or `[High]` finding was fixed or explained instead of fixed, launch one fresh reviewer (same rules as step 6) and give it the plan, the standards, the diff of the fixes, and your explanations. It checks the fixes and says whether it accepts each explanation.
-  - **Stop case 3:** if it doesn't accept an explanation, STOP and ask the user.
-  - Settle its other findings the same way as above, with the same stop cases. There is no second re-review: anything still open goes in the hand-off.
-- Note each finding with its reviewer-assigned severity and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
+- **Stop case 2, data risk:** if a fix would edit a migration script, code that deletes user data (database rows or files), import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan and whatever the finding's severity. If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, the same applies.
+- When a stop case applies, record the question and the user's answer in the finding's disposition in the review record.
 - Work out each requirement's result for the trace table in step 9:
-  - Automated test: run it and record Pass or Fail. A Fail is a new `[High]` finding (a requirement not met): settle it as above, with the same stop cases, before continuing.
-  - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)". A Fail is handled the same way as an automated Fail.
+  - Automated test: run it and record Pass or Fail.
+  - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)".
   - Manual check that needs the user at the app: record "Manual".
+  - A Fail is not a reviewer finding and carries no severity. It is settled like a `[High]` finding: it can only be fixed, never explained away or logged, with the same stop cases. A fixed Fail counts as a fixed `[High]` for the re-review below.
+- Run every check from step 5 again. All must pass. Re-run any requirement test that failed.
+- **Re-review (once):** if any `[Medium]` or `[High]` finding was raised (each is fixed or explained), or a Fail was fixed, launch one fresh reviewer (same rules as step 6) and give it the plan, the standards, the diff of the fixes, and your explanations. It checks the fixes and says whether it accepts each explanation.
+  - **Stop case 3:** if it doesn't accept an explanation, STOP and ask the user.
+  - Settle its other findings the same way as above, with the same stop cases, and run the checks again if you fixed anything. There is no second re-review, so say in the hand-off that those fixes and explanations were not re-checked by a reviewer.
+- Note each finding with its reviewer-assigned severity and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
 
 ## 8. Confirm the plan is untouched
 - Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
@@ -101,6 +102,7 @@ Every finding is listed, with the severity the reviewer assigned (never changed 
 
 - **[Severity]** <one-line description> — <files>
   **Disposition:** fixed (how) | explained (why) | logged in KNOWN_ISSUES.md
+  <If a stop case applied, add the question asked and the user's answer.>
   <If the author disagreed with the severity, add a line saying so and why. The severity above stays as given.>
 
 ## Re-review
