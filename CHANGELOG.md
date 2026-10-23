@@ -1,11 +1,12 @@
 # Changelog
 
-One short entry per change number, grouped under the version it shipped in, newest first. This is the master list of change numbers (`DTP-###`) and versions. The full detail of each change lives in its plan (`docs/plans/`) and review record (`docs/reviews/`). Changes DTP-001 to DTP-083 are numbered after the fact, one per released version, in version order. The original detailed changelog is kept unchanged at `docs/archive/CHANGELOG-detailed.md`.
+One short entry per change number, newest first. Entries wait under Unreleased until a version is built; released ones are grouped under the version they shipped in. This is the master list of change numbers (`DTP-###`) and versions. The full detail of each change lives in its plan (`docs/plans/`) and review record (`docs/reviews/`). Changes DTP-001 to DTP-083 are numbered after the fact, one per released version, in version order. The original detailed changelog is kept unchanged at `docs/archive/CHANGELOG-detailed.md`.
 
 ---
 
 ## [Unreleased]
 
+- PWF-001 (chore) Tightened the workflow: no versions or tags at check-in, `.claude` tracked in git, plan mode blocked, stricter branch checks, no skipping the interview or play-back.
 - DTP-085 (docs) Numbered the changelog, split the review log into per-change records, moved the plans into `docs/`, and removed GENERATED_SPEC.md.
 - DTP-084 (docs) Recorded where v0.40.0 differs from its approved park-hours plan.
 
@@ -77,7 +78,7 @@ One short entry per change number, grouped under the version it shipped in, newe
 
 ## [0.35.0] - 2026-09-17
 
-- DTP-068 (fix) Renamed the Lightning Lane catalog entry "Soarin' Across America" to "Soarin'", and added "Save & Add Another" to reservation entry.
+- DTP-068 (feat) Renamed the Lightning Lane catalog entry "Soarin' Across America" to "Soarin'", and added "Save & Add Another" to reservation entry.
   Migration 024 required.
 
 ## [0.34.0] - 2026-09-17
