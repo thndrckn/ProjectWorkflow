@@ -22,7 +22,7 @@ The user typing `/commit-change` is their go-ahead. Follow these steps in order,
 Find the plan for this branch in `docs/plans/` (its change number is in the branch name). Then check:
 - A review record exists at `docs/reviews/` with the same file name as the plan.
 - `CHANGELOG.md` has an entry for this change number.
-- The plan is untouched since it was approved: `git diff <first commit on this branch> -- <plan file>` shows no changes.
+- The plan is untouched since it was approved: `git diff <approved-plan commit> -- <plan file>` shows no changes. The approved-plan commit is the one whose message is `docs(<NUMBER>): approved plan` (find it with `git log --grep`); never use "the first commit on the branch", which is ambiguous once the default branch has been merged in.
 
 If anything is missing or the plan changed, STOP and tell the user exactly what's wrong. Do not write or fix the records yourself; that is `/code-change`'s job.
 
@@ -39,7 +39,7 @@ Only needed if the default branch has commits the working branch doesn't (`git l
 - Bring the branch up to date by merging the default branch into it (`git merge <default>`). Never rebase: the approved-plan commit must keep its hash.
 - If the merge reports any conflict, run `git merge --abort`, STOP, and tell the user in plain English which files conflict. Ask how they want to proceed. Do not guess a resolution.
 - After the merge, run every check under "Checks (all must pass)" in CLAUDE.md again on the combined code, plus every check under "Checks (only when relevant)" whose condition applies. Run each as its own command, and never leave the shell in a different directory afterwards. If any check fails, STOP and report in plain English.
-- Run `git diff <first commit on this branch> -- <plan file>` again. It must still show no changes.
+- Run `git diff <approved-plan commit> -- <plan file>` again. It must still show no changes.
 - If resolving a conflict changed code (only possible after the user told you how to resolve it), review those changes and record them in the change's review record: add a "Merge conflict resolution" section to `docs/reviews/<plan file name>.md` that lists the files, what was decided and why, and the review result, then commit it on the branch as `docs(<NUMBER>): record merge conflict resolution`. A merge with no conflicts changes no records.
 
 ## 5. Merge and publish

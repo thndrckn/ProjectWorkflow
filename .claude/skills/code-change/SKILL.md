@@ -56,7 +56,7 @@ If something fails, fix it and re-run. If you can't fix it, STOP and report in p
 - Note each finding and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding the user decides to log.
 
 ## 8. Confirm the plan is untouched
-- Run `git diff <first commit on this branch> -- <plan file>`. It must show no changes.
+- Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
 - If it shows any change, STOP, show the user exactly what changed, and do not continue until they decide what to do.
 
 ## 9. Write the documentation
