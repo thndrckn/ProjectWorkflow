@@ -1,0 +1,90 @@
+# Review: PWF-008 — Review accountability
+
+- **Change:** PWF-008
+- **Plan:** docs/plans/PWF-008-review-accountability.md (approved in commit 2b57c38)
+- **Branch:** chore/PWF-008-review-accountability
+- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then one fresh re-reviewer. This record is in the old format, as the plan says: the old `/code-change` rules ran this review, so there are no caused-by labels and no format marker, and the new gate exempts it.
+- **Scope:** diff of chore/PWF-008-review-accountability against master — 6 files changed, about 390 lines (two skill files, CLAUDE.md, docs/DECISIONS.md, the plan, the POLICY.md before-copy), plus `D:\projects\shared-claude-conventions\POLICY.md`, which is outside the repository. Its saved original is `docs/reviews/PWF-008-POLICY.md-before.md`.
+
+## Findings
+Every finding is listed, with the severity the reviewer assigned (never changed by the author).
+
+First review, Spec reviewer:
+- **[Low]** A plan requirement that is missing or wrong was not stated to count as caused in the reviewer briefs (R1 only partly done) — code-change/SKILL.md
+  **Disposition:** fixed (step 6 now says a missing, partly done or wrongly built plan requirement is always "yes", and tells the Spec reviewer)
+- **[Low]** The gate's new-format trigger ("any Caused by this change line anywhere") could catch an old-format record that quotes the phrase — commit-change/SKILL.md
+  **Disposition:** fixed (the trigger is now a line that starts with the marker, or, after leading spaces, with the label field; mid-line prose does not count). The Correctness reviewer raised the same finding as a Low.
+- **[Informational]** Behaviour added beyond the plan (continue mode stops on uncommitted changes, counts rounds across runs, and a "Continuing a change" paragraph in the policy) — code-change/SKILL.md, POLICY.md
+  **Disposition:** explained (an observation; each addition fits the plan's wording and nothing conflicts with it). The re-reviewer accepted this.
+- **[Informational]** Gate rule 4 checked only the last re-review round — commit-change/SKILL.md
+  **Disposition:** fixed (rule 4 now covers every round)
+
+First review, Standards reviewer:
+- **[Low]** Gate rule 5 was ambiguous when no re-review ran — commit-change/SKILL.md, POLICY.md
+  **Disposition:** fixed (rule 3 now says no Re-review section is needed when every finding is plainly fixed, and rules 4 and 5 are then met)
+- **[Low]** Continue-mode detection looser than the plan, with no way to get the change number — code-change/SKILL.md
+  **Disposition:** fixed (the number comes from the branch name, the search is anchored on `^docs(<NUMBER>): approved plan`, and it stops and asks if the branch name has no number)
+- **[Informational]** A plain fix is never independently re-checked when every outcome in a review is a plain fix — code-change/SKILL.md, POLICY.md
+  **Disposition:** explained (by design: the user's rule 3 for this change). Recorded in docs/DECISIONS.md. The re-reviewer accepted this.
+
+First review, Correctness reviewer:
+- **[Medium]** Deadlock after the three-round cap: nothing said what happens after the user answers — code-change/SKILL.md, commit-change/SKILL.md
+  **Disposition:** fixed (the user's recorded answer, "Settled by the user: <answer>", settles open items and the gate accepts it; one extra round is allowed to check a fix made after a gate failure)
+- **[Medium]** Append-only record conflicts with fixing a gate failure — both skills
+  **Disposition:** fixed (a correction line is added under the finding, never a rewrite; a missing label or severity is supplied by a fresh reviewer; the gate reads the latest correction)
+- **[Medium]** Fixes to a re-review round's own new findings were never checked, and a fixed requirement Fail alone did not trigger a re-review — both skills, POLICY.md
+  **Disposition:** fixed (a round is clean only if the re-reviewer raised no new finding at all, and a fixed Fail triggers a re-review in the skill, the gate and the policy)
+- **[Low]** Gate trigger too broad — commit-change/SKILL.md
+  **Disposition:** fixed (same fix as the Spec reviewer's second finding)
+- **[Low]** No path for a rejected "not caused" label or a rejected fix — code-change/SKILL.md
+  **Disposition:** fixed (rejection handling now covers explanations, labels and fixes)
+- **[Low]** Continue-mode edge cases: no review record yet, change-number derivation, continuing an old-format record — code-change/SKILL.md
+  **Disposition:** fixed
+- **[Low]** Leftover old wording ("Medium or High", "like a High finding", gate rule 6 matching only a bare "Fail") — both skills
+  **Disposition:** fixed
+- **[Informational]** The author can still dodge the gate by deleting both the marker and every label line — commit-change/SKILL.md
+  **Disposition:** explained (the plan accepts this; the gate guards against removing the marker alone, and `/code-change` always writes it). The re-reviewer accepted this.
+
+Re-review findings:
+- **[Low]** A user's "Settled by the user" answer could not override gate rule 2, a deadlock — code-change/SKILL.md, commit-change/SKILL.md
+  **Disposition:** fixed (rule 2 now exempts an item carrying the user's recorded answer)
+- **[Low]** Continue mode would re-stop on a round the user already settled, and an unclean extra round had no outcome — code-change/SKILL.md
+  **Disposition:** fixed (a round whose open items carry "Settled by the user" counts as closed, and stop case 4 applies to an unclean extra round as to a third)
+- **[Low]** Gate rule 3 could not detect that a requirement Fail was fixed — both skills
+  **Disposition:** fixed (such a requirement's trace result reads "Pass (fixed after Fail)", and rule 3 requires a re-review for it)
+- **[Low]** In continue mode the author alone decided whether new work needed the full review — code-change/SKILL.md
+  **Disposition:** fixed (any new code, text or rule beyond the smallest edit that fixes an open item gets the full review; when in doubt, run it)
+- **[Nit]** The policy said "up to three rounds in total" but the skills allow one extra round — POLICY.md
+  **Disposition:** fixed (the policy now mentions the one extra round)
+- **[Nit]** The policy said "dated correction line" but the skill says round-numbered — POLICY.md
+  **Disposition:** fixed (the policy now says round-numbered)
+
+## Re-review
+One re-review ran, because three Medium findings were raised. It checked the fixes and explanations above. It accepted all three explanations and found every fix resolved its finding, apart from the points above, which it raised as new Low and Nit findings. It found no Medium or High issues. Those new findings were all fixed. There is no second re-review under the rules this change was reviewed by, so the fixes to the re-review's findings and the policy wording fixes made after it were not re-checked by a reviewer.
+
+## Requirements trace
+| Requirement | Test | Result |
+|---|---|---|
+| R1 | Read the code-change skill: reviewer briefs require severity and a caused label, and a missing or wrong plan requirement and a Fail count as caused | Pass (checked by Claude) |
+| R2 | Read step 7: a caused "yes" finding can only be fixed or explained, never logged | Pass (checked by Claude) |
+| R3 | Read step 7: a "no" finding may be fixed, explained or logged at any severity, and the re-reviewer confirms the label | Pass (checked by Claude) |
+| R4 | Read step 7: trigger, scope and a fresh reviewer each round, repeated until a round is clean | Pass (checked by Claude) |
+| R5 | Read step 7: stop case 4 after the third round with the open items shown | Pass (checked by Claude) |
+| R6 | Read step 7: a rejection is fixed, logged if not caused, or goes to the user | Pass (checked by Claude) |
+| R7 | Read step 7: a label dispute counts as an explanation the re-reviewer must accept | Pass (checked by Claude) |
+| R8 | Read the Continue mode section: detection by branch, steps skipped, append-only, plan frozen | Pass (checked by Claude) |
+| R9 | Read the commit-change gate: all rules, plain-English failure list, stop, new-format trigger, old-format exemption. Live behaviour needs a real run (plan T5) | Pass (checked by Claude) |
+| R10 | Diffed POLICY.md against the before-copy; confirmed the before-copy matches the original (byte-compared before editing) | Pass (checked by Claude) |
+
+## Deviations from the plan
+Additions the review led to, beyond the plan's wording, none contradicting it:
+- Settled-by-the-user wording after the three-round stop, and one extra round to check a fix made after a gate failure.
+- Correction lines for fixing a record without rewriting it.
+- A round is clean only if it raised no new finding at all.
+- A fixed requirement Fail triggers a re-review, and is recorded as "Pass (fixed after Fail)".
+- Continue-mode edge cases: no record yet, an old-format record, and a stricter rule for when new work gets the full review.
+- A by-design entry in docs/DECISIONS.md.
+- The plan allowed a CLAUDE.md line "only if needed"; one line about continue mode was added to the Workflow section.
+
+## Summary
+The review rules now work as the plan describes, in the `/code-change` and `/commit-change` skills and the shared policy. The independent review found real gaps in how the loop ends, how records are corrected, and how the gate detects its trigger; all were fixed. All five checks passed, and the plan is untouched since approval. The first real test of the gate is the next change's check-in (plan T5).

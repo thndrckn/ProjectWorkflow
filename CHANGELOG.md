@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-008 (chore) Review accountability: reviewers label each finding "caused by this change" yes/no, a caused finding must be fixed or explained (never logged), fresh re-reviewers check every non-plain-fix outcome in up to three rounds, /code-change can continue an existing branch, and /commit-change checks the review record before merging. Shared POLICY.md updated to match.
 - PWF-007 (chore) Skill fixes found while setting up Spoolkeeper: the hand-off lists every review finding, backup steps come from a new CLAUDE.md line, reviewers know the records come later, and by-design review decisions go into a new docs/DECISIONS.md that CLAUDE.md loads.
 - PWF-006 (chore) Removed the duplicate PEER_REVIEW.md at the repo root; the identical archived copy in docs/archive/ stays.
 - PWF-005 (chore) The planning interview now follows Matt Pocock's grilling method, written into plan-change with credit: it asks one question at a time (recommended answer first), most-unblocking first, and stops only when nothing is left to ask.

@@ -19,8 +19,8 @@ Run `git branch --show-current` on its own as a separate command first. The chan
 - Read the plan and the existing review record (`docs/reviews/<same file name as the plan>.md`) so you know what is open: failed gate items, unsettled findings, or whatever the user asked you to fix. If the branch has no review record yet, there is nothing to append to: carry on as for a new change from step 4 and write the record in step 9. If the record is in the old format (no `Review format` line and no "Caused by this change" lines), keep that format: append in the same style, do not add the marker, and the gate stays exempt.
 - A gate failure about a record's own content (a missing label, severity or disposition, or a "caused: yes" finding marked logged) is fixed by **adding a correction line** under that finding, never by deleting or rewriting it: `**Correction (round N):** <what is now true>`. A missing label or severity is supplied by a fresh reviewer, never by you. The gate reads each finding as corrected by its latest correction line.
 - Do step 4 for those fixes only, then step 5.
-- Run the re-review loop in step 7 on the open items and the new fixes (the re-reviewer gets the diff of the new commits). Run the step 6 review as well only if the new work goes beyond fixing what was open, and give those reviewers the whole branch diff as usual.
-- Re-review rounds count across the whole change, not per run: if the record already shows three rounds and the last one wasn't clean, STOP and ask the user instead of starting another, and settle the open items according to their answer (see stop case 4 in step 7). If the record already shows three rounds and the last was clean but a gate failure needs a further fix, that fix's check is one extra round beyond the limit, and only for that fix; say so in the record.
+- Run the re-review loop in step 7 on the open items and the new fixes (the re-reviewer gets the diff of the new commits). Run the step 6 review as well whenever the new work includes anything beyond the smallest edit that fixes an open item (new code, new text, or a changed rule); when in doubt, run it. Give those reviewers the whole branch diff as usual.
+- Re-review rounds count across the whole change, not per run. A round whose open items carry "Settled by the user" counts as closed. If the record already shows three rounds and the last one wasn't clean and isn't closed that way, STOP and ask the user instead of starting another, and settle the open items according to their answer (see stop case 4 in step 7). If the record already shows three rounds and the last was clean but a gate failure needs a further fix, that fix's check is one extra round beyond the limit, and only for that fix; say so in the record. If that extra round isn't clean either, stop case 4 applies to it exactly as to a third round.
 - Do step 8, then in step 9 **append** to the existing review record: add a new round, and never rewrite or delete earlier rounds or findings. Do not add a second CHANGELOG entry; edit the existing one only if what the change does has changed. Then step 10.
 
 If the current branch is the default branch, or has no approved-plan commit, continue with step 1 as normal.
@@ -138,6 +138,8 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 | Requirement | Test | Result |
 |---|---|---|
 | R1 | <the test, as in the plan or as built> | Pass \| Fail \| Pass (checked by Claude) \| Fail (checked by Claude) \| Manual |
+
+A requirement whose test failed and was then fixed is recorded as "Pass (fixed after Fail)" (or "Pass (checked by Claude, fixed after Fail)"), so the gate can see a re-review was required.
 
 ## Deviations from the plan
 <Anything built differently from the approved plan, and why. "None" if none.>
