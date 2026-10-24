@@ -12,7 +12,8 @@ Every finding is listed, with the severity the reviewer assigned (never changed 
 **Standards**
 
 - **[Low]** CLAUDE.md states the backup steps twice: the new "Backup before a migration" line and the older "Real data lives in dev" line — CLAUDE.md
-  **Disposition:** logged in KNOWN_ISSUES.md. The plan says the older line stays, so trimming it would go against the plan.
+  **Disposition:** fixed. The older "Real data lives in dev" line now points to the "Backup before a migration" line instead of restating the steps.
+  Stop case 1 (plan conflict): the plan said "The existing 'Real data lives in dev' line stays", and this change caused the duplicate, so fixing it went against the plan. I first logged it in KNOWN_ISSUES.md. The user then decided: make the new line the only place the steps are stated, change the older line to point to it, record it as an approved deviation, and remove the KNOWN_ISSUES entry. Done as decided.
 - **[Low]** The new backup line says "copy `data/disney_trip.db`", and the policy puts `data/` off-limits to Claude, so it should be worded as a step for the user — CLAUDE.md, .claude/skills/code-change/SKILL.md
   **Disposition:** explained. Copying only reads the file. The skill already said to back up first when the user asks to run something against `data/`, so behaviour is unchanged; the skill only moved the steps into CLAUDE.md.
 - **[Nit]** `@docs/DECISIONS.md` is a relative path while the policy import is absolute — CLAUDE.md
@@ -20,12 +21,12 @@ Every finding is listed, with the severity the reviewer assigned (never changed 
 - **[Informational]** The by-design rule doesn't say where CLAUDE.md's older "deliberately" notes fit — code-change skill, plan
   **Disposition:** explained. The plan's "Not included" leaves moving them for a later change.
 - **[Informational]** The missing-line fallback wording repeats in three skills — build-changes, code-change, commit-change
-  **Disposition:** explained. Each skill has to stand alone, and R3 and R4 ask for it in each.
+  **Disposition:** explained as by design: each skill has to stand alone, and R3 and R4 ask for it in each. Recorded in docs/DECISIONS.md (PWF-007, 2026-10-24).
 
 **Spec** (no requirement missing; R1 to R9 all met)
 
 - **[Informational]** The "Real data lives in dev" line still repeats the backup instruction — CLAUDE.md
-  **Disposition:** logged (same entry as the first Standards finding).
+  **Disposition:** fixed (same fix as the first Standards finding, approved by the user).
 - **[Informational]** Whether the `@docs/DECISIONS.md` import loads can't be checked until a new session starts — CLAUDE.md
   **Disposition:** explained. The plan says the user confirms this at the next session start.
 - **[Nit]** The reviewer-brief note is its own bullet, not part of the common brief bullet — code-change skill
@@ -58,7 +59,9 @@ Every finding is listed, with the severity the reviewer assigned (never changed 
 | R9 | T5: CLAUDE.md imports docs/DECISIONS.md and the file exists with header and format, no entries | Pass (checked by Claude) — the import itself loads at the next session start |
 
 ## Deviations from the plan
-None. The plan's Technical detail named the skill step numbers as approximate; the edits went where the matching headings are.
+
+- **Approved by the user:** the plan's Technical detail said CLAUDE.md's existing "Real data lives in dev" line stays. It was changed to point to the new "Backup before a migration" line, so that line is the only place the backup steps are stated. The user decided this after the review, because the duplicate was caused by this change. The earlier KNOWN_ISSUES.md entry for it was removed.
+- The plan's Technical detail named the skill step numbers as approximate; the edits went where the matching headings are.
 
 ## Summary
-The workflow skills and CLAUDE.md now match the plan. All checks pass (384 Rust tests, clippy, fmt, lint, vite build). The reviewers raised no `[Medium]` or `[High]` findings; three small wording findings were fixed, one was logged, and the rest were explained. docs/DECISIONS.md was created with no entries, because none of the findings was a by-design decision.
+The workflow skills and CLAUDE.md now match the plan, apart from the approved deviation above. All checks pass (384 Rust tests, clippy, fmt, lint, vite build). The reviewers raised no `[Medium]` or `[High]` findings; three small wording findings and the duplicate backup line were fixed, and the rest were explained. One explanation was a by-design decision and is recorded in docs/DECISIONS.md.

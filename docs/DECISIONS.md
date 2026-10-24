@@ -10,3 +10,8 @@ Entry format:
 - **Date:** <YYYY-MM-DD>
 - **Reason:** <why it is this way>
 ```
+
+## Each skill states its own missing-backup-line fallback
+- **Change:** PWF-007
+- **Date:** 2026-10-24
+- **Reason:** `/code-change`, `/commit-change` and `/build-changes` each say what to do when CLAUDE.md has no "Backup before a migration" line (say so and ask the user), instead of pointing at one shared place. Each skill has to stand alone when it runs, so the repeated wording is deliberate, not duplication to remove.
