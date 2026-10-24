@@ -174,15 +174,27 @@ function splitRedirects(words) {
 //   branch -D, or --delete / -d together with --force / -f.
 // Short flags may be clustered (-df), so a cluster is checked letter by letter.
 function destructiveGitFlag(sub, rest) {
-  const flags = rest.filter((a) => a.startsWith('-') && a !== '--');
+  // In a short-flag cluster, the rest of the token after a value-taking letter is that
+  // flag's value (-ukeyid), so only the letters before it count.
+  const valueLetters = { tag: 'umF', switch: 'cC', branch: 'u' }[sub] || '';
+  const valueLongs = sub === 'tag' ? ['--message', '--local-user', '--file'] : [];
+  // Collect the flags, leaving out the separate-token value of a value-taking flag
+  // (git tag -m -d: "-d" is the message) and everything after "--".
+  const flags = [];
+  for (let i = 0; i < rest.length; i++) {
+    const a = rest[i];
+    if (a === '--') break;
+    if (!a.startsWith('-')) continue;
+    flags.push(a);
+    const letters = /^-[a-zA-Z]+$/.test(a) ? a.slice(1) : '';
+    const firstValue = [...letters].findIndex((ch) => valueLetters.includes(ch));
+    if ((firstValue >= 0 && firstValue === letters.length - 1) || valueLongs.includes(a)) i++;
+  }
   // Git accepts any unambiguous prefix of a long option (--del for --delete).
   const long = (full) => flags.some((a) => {
     const name = a.split('=')[0];
     return name.length > 2 && name.startsWith('--') && full.startsWith(name);
   });
-  // In a short-flag cluster, the rest of the token after a value-taking letter is that
-  // flag's value (-ukeyid), so only the letters before it count.
-  const valueLetters = { tag: 'umF', switch: 'cC', branch: 'u' }[sub] || '';
   const cluster = (letter) => flags.some((a) => {
     if (!/^-[a-zA-Z]+$/.test(a)) return false;
     for (const ch of a.slice(1)) {
