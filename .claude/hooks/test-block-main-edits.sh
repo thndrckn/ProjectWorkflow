@@ -48,7 +48,7 @@ for c in 'git commit -m x' 'git add .' 'git add -A' 'git cherry-pick abc' 'git r
   'git status && git commit -m x' 'git diff --output=out.txt' \
   'git tag -d v1' 'git tag --delete v1' 'git switch -f main' 'git switch --force main' \
   'git switch --discard-changes main' 'git switch -fc x' 'git branch -D x' 'git branch --delete --force x' \
-  'git branch -d -f x' 'git branch -df x' 'git branch -fd x' 'git branch -d --force x'; do
+  'git tag --del v1' 'git switch --discard x' 'git switch --forc x' 'git branch --del --force x' 'git branch --del -f x' 'git branch -d -f x' 'git branch -df x' 'git branch -fd x' 'git branch -d --force x'; do
   blocked "$c"
 done
 
@@ -65,7 +65,7 @@ done
 echo "== R3: allow-listed git and read-only commands are allowed on master"
 for c in 'git status' 'git log -3' 'git diff' 'git diff main...HEAD' 'git show HEAD' 'git fetch' \
   'git pull --ff-only' 'git merge --no-ff feat' 'git merge --abort' 'git push' 'git push origin master' \
-  'git tag v1.0.0' 'git tag --list' 'git tag -a v1 -m x' 'git branch --delete x' 'git switch -c x' 'git switch master' 'git branch' \
+  'git tag v1.0.0' 'git tag --list' 'git tag -a v1 -m x' 'git tag -ukeyid v1' 'git tag -m "msg -d" v1' 'git switch --detach' 'git switch -cf x' 'git branch --delete x' 'git switch -c x' 'git switch master' 'git branch' \
   'git branch --show-current' 'git branch -d x' 'git rev-parse --abbrev-ref HEAD' 'git ls-files' \
   'git remote' 'git remote -v' 'git remote show origin' 'git remote get-url origin' \
   'git config --get user.name' 'git config --list' 'git config user.name' 'git checkout -b x' \

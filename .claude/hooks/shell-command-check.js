@@ -175,12 +175,27 @@ function splitRedirects(words) {
 // Short flags may be clustered (-df), so a cluster is checked letter by letter.
 function destructiveGitFlag(sub, rest) {
   const flags = rest.filter((a) => a.startsWith('-') && a !== '--');
-  const cluster = (letter) => flags.some((a) => /^-[a-zA-Z]+$/.test(a) && a.includes(letter));
-  if (sub === 'tag' && (flags.includes('--delete') || cluster('d'))) return 'tag -d';
-  if (sub === 'switch' && (flags.includes('--force') || flags.includes('--discard-changes') || cluster('f'))) return 'switch -f';
+  // Git accepts any unambiguous prefix of a long option (--del for --delete).
+  const long = (full) => flags.some((a) => {
+    const name = a.split('=')[0];
+    return name.length > 2 && name.startsWith('--') && full.startsWith(name);
+  });
+  // In a short-flag cluster, the rest of the token after a value-taking letter is that
+  // flag's value (-ukeyid), so only the letters before it count.
+  const valueLetters = { tag: 'umF', switch: 'cC', branch: 'u' }[sub] || '';
+  const cluster = (letter) => flags.some((a) => {
+    if (!/^-[a-zA-Z]+$/.test(a)) return false;
+    for (const ch of a.slice(1)) {
+      if (ch === letter) return true;
+      if (valueLetters.includes(ch)) return false;
+    }
+    return false;
+  });
+  if (sub === 'tag' && (long('--delete') || cluster('d'))) return 'tag -d';
+  if (sub === 'switch' && (long('--force') || long('--discard-changes') || cluster('f'))) return 'switch -f';
   if (sub === 'branch') {
-    const del = flags.includes('--delete') || cluster('d');
-    const force = flags.includes('--force') || cluster('f');
+    const del = long('--delete') || cluster('d');
+    const force = long('--force') || cluster('f');
     if (cluster('D') || (del && force)) return 'branch -D';
   }
   return null;
