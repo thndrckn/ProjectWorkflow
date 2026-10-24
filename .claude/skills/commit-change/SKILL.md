@@ -65,7 +65,7 @@ Tell the user in plain English:
 - The change number and title that were checked in.
 - That the default branch is on GitHub.
 - Anything they still need to do by hand, such as running a new migration: the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask them how to back up).
-- Last of all, only if the plan has an "Original request (set aside)" section: end the report with a one-line lead-in saying the original request is still waiting, then a fenced code block holding `/plan-change ` followed by the recorded request exactly as written in the plan, ready to paste. Nothing comes after it. If the plan has no such section, add nothing.
+- Last of all, only if the plan has an "Original request (set aside)" section: end the report with a one-line lead-in saying the original request is still waiting, then a fenced code block holding `/plan-change ` followed on the same line by the recorded request exactly as written in the plan (any further lines unchanged, nothing trimmed or rewrapped), ready to paste. Use a fence longer than any run of backticks inside the request (or `~~~`). Nothing comes after it. If the plan has no such section, add nothing.
 
 ## Never
 - Merge without completing steps 1–4.
