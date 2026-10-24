@@ -20,8 +20,3 @@ Entry format:
 - **Change:** PWF-002
 - **Date:** 2026-10-23
 - **Reason:** Every change adds an entry at the top of `## [Unreleased]` in `CHANGELOG.md`, so when two changes are in flight, the second one's catch-up merge in `/commit-change` will usually conflict there. The skill aborts the merge and asks the user on any conflict, and never edits the CHANGELOG entry itself, so that conflict is resolved by hand each time. Accepted for now: it keeps conflict decisions with the user. A rule for resolving CHANGELOG-only conflicts automatically would need its own change. (Moved here from the former known-issues file in PWF-009.)
-
-## The master shell guard is a best-effort allow-list, not a sandbox
-- **Change:** PWF-010
-- **Date:** 2026-10-24
-- **Reason:** On `master`, the guard allows git by subcommand (the list the user chose), so a destructive flag of an allowed subcommand (`branch -D`, `switch -f`, `tag -d`) is not inspected, and it matches recognisable file-writing commands rather than analysing scripts or interpreters (`node -e`, `python -c`), `find -exec`, or commands built from variables. Tightening it further would block legitimate check-in and build work and need constant upkeep; anything it can't resolve is treated as inside the project and blocked. The limits are stated in `block-main-edits.sh`, `shell-command-check.js` and CLAUDE.md.

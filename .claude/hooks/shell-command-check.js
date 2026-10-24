@@ -12,9 +12,8 @@ import path from 'node:path';
 
 const proj = normPath(process.argv[2] || '');
 
-// Git subcommands allowed as a whole. The user set this list at subcommand level,
-// so destructive flags of an allowed subcommand (branch -D, switch -f, tag -d) are
-// not inspected; only --output (which writes a file) is.
+// Git subcommands allowed as a whole, apart from the flags in destructiveGitFlag()
+// (tag -d, switch -f, branch -D) and --output (which writes a file).
 const GIT_PLAIN = new Set([
   'status', 'log', 'diff', 'show', 'fetch', 'merge', 'tag', 'switch', 'branch',
   'rev-parse', 'ls-files',
@@ -170,6 +169,23 @@ function splitRedirects(words) {
   return { words: out, targets };
 }
 
+// Names the flag that makes an allowed subcommand destructive, or null.
+//   tag -d / --delete; switch -f / --force / --discard-changes;
+//   branch -D, or --delete / -d together with --force / -f.
+// Short flags may be clustered (-df), so a cluster is checked letter by letter.
+function destructiveGitFlag(sub, rest) {
+  const flags = rest.filter((a) => a.startsWith('-') && a !== '--');
+  const cluster = (letter) => flags.some((a) => /^-[a-zA-Z]+$/.test(a) && a.includes(letter));
+  if (sub === 'tag' && (flags.includes('--delete') || cluster('d'))) return 'tag -d';
+  if (sub === 'switch' && (flags.includes('--force') || flags.includes('--discard-changes') || cluster('f'))) return 'switch -f';
+  if (sub === 'branch') {
+    const del = flags.includes('--delete') || cluster('d');
+    const force = flags.includes('--force') || cluster('f');
+    if (cluster('D') || (del && force)) return 'branch -D';
+  }
+  return null;
+}
+
 function gitCheck(args) {
   let i = 0;
   while (i < args.length && args[i].startsWith('-')) {
@@ -181,6 +197,8 @@ function gitCheck(args) {
   const rest = args.slice(i + 1).map(stripQuotes);
   if (sub === '') return null;
   if (rest.some((a) => a.startsWith('--output'))) return `git ${sub} --output writes a file`;
+  const destructive = destructiveGitFlag(sub, rest);
+  if (destructive) return `git ${destructive} is not allowed`;
   if (GIT_PLAIN.has(sub)) return null;
   const nonOpt = rest.filter((a) => !a.startsWith('-'));
   switch (sub) {
