@@ -43,7 +43,7 @@ Run every check under "Checks (all must pass)" in CLAUDE.md, plus every check un
 - Create the branch `build/vX.Y.Z` from the default branch.
 - In `CHANGELOG.md`, move the Unreleased entries under a new heading `## [X.Y.Z] - <today's date>`, leaving an empty `## [Unreleased]` above it.
 - Set the version in the version files that hold it directly (everything under "Version files" in CLAUDE.md except the lockfiles).
-- Regenerate the lockfiles with the tools, never by hand, with the commands in CLAUDE.md's "Lockfile commands" line (if CLAUDE.md has no such line, say so and ask the user how). Then compare each lockfile against the default branch (`git diff <default> -- <lockfile>`). The only changes allowed are this app's own version lines. If anything else changed (for example a dependency version), STOP, leave the branch as it is, show the user the diff, and do not commit.
+- Regenerate the lockfiles with the tools, never by hand, with the commands in CLAUDE.md's "Lockfile commands" line (if CLAUDE.md has no such line, say so and ask the user how). Then compare each lockfile against the default branch (`git diff <default> -- <lockfile>`). The only changes allowed are the project's own version lines. If anything else changed (for example a dependency version), STOP, leave the branch as it is, show the user the diff, and do not commit.
 - Commit everything on the branch with the message `chore(release): vX.Y.Z`.
 - Switch to the default branch and merge with `git merge --no-ff build/vX.Y.Z`, using the message `chore(release): vX.Y.Z`. If the merge conflicts, run `git merge --abort`, STOP, and tell the user.
 - Push the default branch. If the push is rejected, STOP and tell the user in plain English. Do not force-push.
