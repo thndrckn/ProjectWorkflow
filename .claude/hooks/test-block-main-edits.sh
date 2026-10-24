@@ -13,7 +13,7 @@ mk_repo() {
   git -C "$1" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 }
 master="$tmp/master-repo"; mk_repo "$master"
-feature="$tmp/feature-repo"; mk_repo "$feature"; git -C "$feature" switch -q -c chore/DTP-000-x
+feature="$tmp/feature-repo"; mk_repo "$feature"; git -C "$feature" switch -q -c chore/ABC-000-x
 norepo="$tmp/not-a-repo"; mkdir "$norepo"
 other="$tmp/elsewhere"; mkdir "$other"
 
@@ -77,7 +77,7 @@ done
 echo "== R4: writes outside the project, or to plan files, are allowed on master"
 for c in 'echo hi > /dev/null' 'echo hi 2>/dev/null' "echo hi > $other/x.txt" "cp a $other/b" \
   "rm $other/x" "tee $other/x" 'echo hi > $null' 'Out-File $null' "Set-Content -Path $other/x -Value hi" \
-  "echo hi > $master/docs/plans/DTP-001-x.md" 'echo hi > docs/plans/DTP-001-x.md' \
+  "echo hi > $master/docs/plans/ABC-001-x.md" 'echo hi > docs/plans/ABC-001-x.md' \
   'cmd 2>&1' 'git status > /dev/null 2>&1' 'ls>/dev/null' 'ls 2>&1 | head' "echo hi>$other/x.txt"   "echo hi >| $other/x.txt" 'echo "$(git status)"' 'timeout 5 git status' 'env -i git log'   "Out-File -FilePath:$other/x.txt" 'curl http://x' "curl -o $other/x http://x" 'ls >&2'; do
   allowed "$c"
 done
@@ -101,7 +101,7 @@ both "detached HEAD allows: git status" 0 "$detached" 'git status'
 echo "== R7: edit tools behave as before"
 for t in Edit Write MultiEdit; do
   check "master blocks $t on a project file" 2 "$master" "$t" "$master/src/x.ts"
-  check "master allows $t on a plan file" 0 "$master" "$t" "$master/docs/plans/DTP-001-x.md"
+  check "master allows $t on a plan file" 0 "$master" "$t" "$master/docs/plans/ABC-001-x.md"
   check "master blocks $t climbing out of plans" 2 "$master" "$t" "$master/docs/plans/../src/x.ts"
   check "feature allows $t on a project file" 0 "$feature" "$t" "$feature/src/x.ts"
 done
