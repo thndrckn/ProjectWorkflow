@@ -27,7 +27,15 @@ Never skip the interview or the play-back. If the request already answers everyt
 - If no numbers exist yet in either place, do not guess. Ask the user which number to use and STOP until they answer.
 - Tell the user the number in one line, for example: "This change is ABC-085."
 
-## 3. Interview the user
+## 3. Put the backlog to the user
+Read `docs/BACKLOG.md`. If it is missing or has no entries, say nothing and go to step 4. Otherwise, before the interview, put every entry to the user, new and queued alike, one at a time, in the question box (AskUserQuestion), one question per box, in the order they appear in the file. Asking every time is deliberate: it keeps the backlog small. Show the entry's title, where it was found, its severity and what is wrong, and offer exactly three choices:
+- **Plan it now.** Planning switches to that item: it becomes this change (the number from step 2 stays with it), and your interview is about the item, not the original request. Ask no more backlog questions; the remaining items wait for the next `/plan-change`. Tell the user plainly that their original request needs its own `/plan-change`. The plan names the item in a "Backlog items fixed" line.
+- **Keep it queued.** Nothing changes. Go to the next item.
+- **Accept it.** Ask for the reason in a follow-up question box. Nothing is written now (the default branch is protected): the plan lists the item and the reason under "Backlog items accepted", and `/code-change` adds it to `docs/DECISIONS.md` and removes it from the backlog.
+
+Keep a list of every question asked and the answer given, here and in the interview, for the play-back and the plan file.
+
+## 4. Interview the user
 Grill the user relentlessly until you reach a shared understanding. Method adapted from Matt Pocock's grilling skill.
 
 Map the change as a design tree: every decision branches into the decisions that hang off it. The **frontier** is every decision whose prerequisites are already settled, the questions you can ask now without guessing at answers you haven't heard yet. A question whose answer depends on another open question is not on the frontier yet.
@@ -38,14 +46,14 @@ Work the frontier with these rules:
 - Wait for the user's reply. Each answer settles decisions and may unblock others, so recompute the frontier before asking the next question.
 - Only ask about real decisions: what it should do, edge cases, trade-offs. Finding facts is your job, never the user's: look them up yourself, and use a sub-agent only for a broad search. Never ask about facts you can look up.
 - Ask about anything risky as its own question: schema changes, migrations, data that could be lost or changed, anything touching import/export or deletes.
-- Stop only when the frontier is empty: every branch visited, nothing left silently assumed. Then go to the play-back (step 4). The user's yes there is the confirmation of shared understanding.
+- Stop only when the frontier is empty: every branch visited, nothing left silently assumed. Then go to the play-back (step 5). The user's yes there is the confirmation of shared understanding.
 
-## 4. Play it back
+## 5. Play it back
 Draft the requirements from the interview. Every plan has at least one requirement, whatever its type. Each is a numbered Given / When / Then case (R1, R2, …) in plain English that can be checked on its own.
-Sum up the shared understanding in a few plain-English sentences, list the proposed requirements, and ask: "Is that right?"
+Sum up the shared understanding in a few plain-English sentences, list the proposed requirements, and list every question asked so far (backlog and interview) with the user's answer. Then ask: "Is that right?"
 Wait for a yes. A yes covers the requirements too. If the user corrects anything, including a requirement, fix your understanding and play it back again.
 
-## 5. Write the plan file
+## 6. Write the plan file
 Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated.
 
 Use exactly this format. The top sections are for the user: plain English, no code, SQL, or file paths.
@@ -62,6 +70,15 @@ Use exactly this format. The top sections are for the user: plain English, no co
 ## Requirements
 - **R1.** Given <starting situation>, when <something happens>, then <what must be true>.
 - **R2.** Given …, when …, then ….
+
+## Decisions from the interview
+<A table of every question asked (backlog questions and interview questions, including the play-back) and the user's answer, so a reviewer can check any "the user decided" claim against it.>
+
+## Backlog items fixed
+<Only when the change fixes backlog items: the title of each. /code-change removes them from docs/BACKLOG.md. Leave this section out otherwise.>
+
+## Backlog items accepted
+<Only when the user accepted items: each title with the user's reason. /code-change adds them to docs/DECISIONS.md and removes them from the backlog. Leave this section out otherwise.>
 
 ## What could go wrong / what gets lost
 <Data loss, migrations to run by hand, risky changes. Always present. Write "Nothing" if so.>
@@ -100,7 +117,7 @@ Rules for the plan:
 - Follow the project's architecture: business logic in Rust, the full feature cycle, lookup tables, numbered migrations.
 - If any section would be long, the change is probably too big. Say so and suggest splitting it into separate changes, each with its own number.
 
-## 6. Stop
+## 7. Stop
 After saving the plan, open it in the editor by running `code <plan file path>` as its own separate command, never combined with another command. Then tell the user they can press Ctrl+Shift+V for the formatted preview. If the `code` command isn't available, say so and give the plan's path instead.
 
 Tell the user, in plain English:

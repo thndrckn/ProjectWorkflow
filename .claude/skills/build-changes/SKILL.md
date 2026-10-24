@@ -36,7 +36,7 @@ Run every check under "Checks (all must pass)" in CLAUDE.md, plus every check un
 ## 5. Integration review
 - Review everything since the last version tag found in step 3 (`git diff <last tag>..HEAD`), focused on how the changes interact with each other: conflicting assumptions, one change undoing or bypassing another, shared code or data touched by more than one change, migrations that depend on each other. Each change was already reviewed on its own, so do not repeat that.
 - Use /code-review for the diff, and add your own look at the interactions.
-- Present every finding with a severity, a one-line plain-English description, and the files involved. Every finding ends in one of three places: fixed (through a new change), explained (wrong, by design, or a pure observation, with the reason), or logged in KNOWN_ISSUES.md (also through a new change, since the build edits nothing). Nothing is left unaccounted for.
+- Present every finding with a severity, a one-line plain-English description, and the files involved. Every finding ends in one of three places: fixed (through a new change), explained (wrong, by design, or a pure observation, with the reason), or logged in `docs/BACKLOG.md` (also through a new change, since the build edits nothing). Nothing is left unaccounted for.
 - If it finds a problem, STOP the build. Tell the user the fix goes through the normal workflow (`/plan-change`) as a new change, and that they can run `/build-changes` again afterwards. The build never fixes code itself. If there are no problems, say so and continue.
 
 ## 6. Make the version

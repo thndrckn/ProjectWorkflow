@@ -50,6 +50,7 @@ If the current branch is the default branch, or has no approved-plan commit, con
 - Build the plan's "Planned tests" for its requirements. A test built differently from the plan is a deviation (step 9).
 - When the change edits a file outside the repository (so git can't show the edit), before editing it save a copy of the original on the branch as `docs/reviews/<NUMBER>-<file name>-before.md`, unchanged, and commit it with the records in step 9.
 - Commit work in progress on the branch as you go, with messages that start with the plan's type and number, for example `feat(ABC-085): add status table`. Nothing goes to the default branch in this step.
+- **Backlog items:** if the plan has a "Backlog items fixed" line, remove each named entry from `docs/BACKLOG.md` as part of the fix (the change's own records keep the history). If it has a "Backlog items accepted" section, add each item to `docs/DECISIONS.md` as an entry with this change's number, today's date and the user's reason from the plan, then remove it from `docs/BACKLOG.md`. These edits are part of the diff, so the Spec reviewer checks them.
 - Write migration scripts when the plan calls for them, but never run anything against files in `data/` unless the user's current message explicitly asks. If they do, take the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask the user how to back up).
 
 ## 5. Run the checks
@@ -62,7 +63,7 @@ The review is done by reviewers independent of you. You wrote the code, so you d
 
 - Launch three fresh sub-agents in parallel with the Agent tool (general-purpose), and tell each one to read and report only, never edit. They are the reviewers; nothing in this step is a review you do yourself.
   - **Standards:** does the diff follow the documented standards? Give it every file that documents how code is written (CLAUDE.md, the shared policy it imports, `docs/DECISIONS.md` if it exists, and `CODING_STANDARDS.md` or `CONTRIBUTING.md` if they exist), plus the smell baseline below pasted in full. A documented standard breach can be a hard violation. Baseline smells are always judgement calls, and a documented standard overrides the baseline. Skip anything the checks already enforce.
-  - **Spec:** does the diff match the approved plan? Give it the plan file. It reports requirements that are missing or only partly done, behaviour that wasn't asked for, and requirements that look done but look wrong, quoting the plan line for each.
+  - **Spec:** does the diff match the approved plan? Give it the plan file. It reports requirements that are missing or only partly done, behaviour that wasn't asked for, and requirements that look done but look wrong, quoting the plan line for each. If the plan names backlog items fixed or accepted, it also confirms each is gone from `docs/BACKLOG.md` (and each accepted one is in `docs/DECISIONS.md` with its reason).
   - **Correctness:** is the code right? Depth by change type: `feat:` two angles, general correctness plus the most relevant second one (data integrity for schema changes, security for external input, and so on); `fix:` confirm the root cause was fixed and look for the same bug pattern elsewhere in the touched files; `refactor:` confirm behaviour didn't change.
 - Give each reviewer only the inputs for its own job, from this list: the diff command (`git diff <default branch>...HEAD`) and commit list, the plan file (Spec and Correctness), the standards files, including `docs/DECISIONS.md` (Standards), and the saved before-copy plus the file's path if the change edited a file outside the repository (they compare the two). Do not pass your own summary, reasoning or opinion of the code. The one exception is a re-reviewer in step 7: its job is to check your outcomes, so it is given each finding with your outcome and your reasoning for it.
 - Each reviewer's brief requires every finding to have a severity, a "Caused by this change: yes/no" label, a one-line plain-English description, and the files involved. Severities: `[High]` data loss or corruption, a security hole, a crash, or a requirement plainly not met; `[Medium]` a real bug or a requirement only partly met in realistic use; `[Low]` a minor bug, an edge case, or a standards breach; `[Nit]` style or wording; `[Informational]` an observation that needs no action. "Caused" means the problem is in what this change added or altered, or in behaviour it changed ("yes"); a problem that was already there and that this change neither added, altered nor changed the behaviour of is "no". A requirement of the plan that is missing, only partly done or wrongly built is always "yes"; tell the Spec reviewer so. Ask for under 400 words each.
@@ -76,7 +77,7 @@ Settle every finding yourself. Do not stop to ask the user which to fix. Stop on
 
 You never have the last word on your own findings: every outcome, including every fix, is checked by a fresh reviewer below.
 
-- Every finding ends in one of three places: **fixed**, **explained** ("not a real problem": wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. Nothing is left unaccounted for. What is allowed depends on the reviewer's "Caused by this change" label:
+- Every finding ends in one of three places: **fixed**, **explained** ("not a real problem": wrong, by design, or a pure observation, with the reason), or **logged** in `docs/BACKLOG.md`. Nothing is left unaccounted for. What is allowed depends on the reviewer's "Caused by this change" label:
   - **Caused: yes** — can only be fixed, or explained with a reason the re-reviewer accepts. It can never be logged, and never accepted as is.
   - **Caused: no** — can be fixed, explained, or logged, at any severity. The re-reviewer confirms that "no" is true.
 - Never change a reviewer's severity or caused label. If you think either is wrong, say so in the finding's disposition and keep it as given. The only way to move a "yes" to "no" is to dispute it with an explanation, which counts as an explained outcome the re-reviewer must accept; until it accepts, the label stays "yes".
@@ -99,7 +100,7 @@ You never have the last word on your own findings: every outcome, including ever
   - **Another round:** a round is clean only when every outcome in it is accepted by the re-reviewer and it raised **no new finding at all**. A new finding, even one you then fix at once, makes the round not clean, so that fix is checked by the next round. If a round isn't clean, run the next round with a new fresh reviewer, which checks everything from that round's fixes, explanations and logged items. Keep going until a round is clean.
   - **Stop case 4:** if the last permitted re-review round (the third, or an extra round the user authorised) is still not clean, STOP and show the user every item that is still open. Settle each open item according to the user's answer and record, under that item, the question and the answer as "Settled by the user: <answer>". The user's answer is the final word on those items, the gate accepts it in place of a clean round, and no further round is run unless the user asks for one.
 - **By-design decisions:** when a finding is explained as by design, add the decision and its reason to `docs/DECISIONS.md` as an entry with this change's number and today's date, unless the same decision is already there (if the file doesn't exist, create it with a `# Design decisions` title, one line saying what the file is for, and the entry format: a heading with the decision, then Change, Date and Reason lines). If the re-reviewer later rejects the explanation, revise or remove the entry according to the user's answer. An observation that isn't a decision is explained in the review record only, never in `docs/DECISIONS.md`. Commit the entry with the records in step 9.
-- Note each finding with its reviewer-assigned severity and caused label, where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and what the re-reviewer said about it, and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
+- Note each finding with its reviewer-assigned severity and caused label, where it ended up (fixed and how; explained and why; or logged in BACKLOG.md), and what the re-reviewer said about it, and anything that now differs from the plan. These go in the review record in step 9. Add an entry to `docs/BACKLOG.md` for every finding you log, in its format (a `## <title>` heading, then Found in, Severity, Files and What's wrong lines); if the file doesn't exist, create it with that format described at its top.
 
 ## 8. Confirm the plan is untouched
 - Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
@@ -127,7 +128,7 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 
 - **[Severity]** <one-line description> — <files>
   **Caused by this change:** yes | no
-  **Disposition:** fixed (how) | explained (why) | logged in KNOWN_ISSUES.md
+  **Disposition:** fixed (how) | explained (why) | logged in BACKLOG.md
   <If a stop case applied, add the question asked and the user's answer.>
   <If the author disagreed with the severity or the label, add a line saying so and why. The severity and label above stay as given.>
 
@@ -160,7 +161,7 @@ Always call out a new migration. Don't repeat the review findings; the review re
 **Only if this change affects them:**
 - **CLAUDE.md**: something Claude needs to know next time (a new module, table, rule, or convention).
 - **README.md**: something a user would notice (a new feature, a new setup or run step).
-- **KNOWN_ISSUES.md**: every finding logged there in step 7, so it isn't forgotten.
+- **docs/BACKLOG.md**: every finding logged there in step 7, so it isn't forgotten.
 - **docs/DECISIONS.md**: every by-design decision recorded in step 7. Commit it with these records.
 
 Do not add new entries to `docs/archive/PEER_REVIEW.md`; it is the archive of older reviews.
