@@ -1,6 +1,6 @@
 ---
 name: code-change
-description: Second step of the workflow, run by the user after a plan is approved. Creates the branch, writes the code and tests, runs checks, gets an independent code review, settles every finding itself (stopping to ask only for a plan conflict, data risk, or an explanation the re-reviewer rejects), re-runs checks, writes the documentation, and hands off for /commit-change. Never merges to the default branch.
+description: Second step of the workflow, run by the user after a plan is approved. Creates the branch, writes the code and tests, runs checks, gets an independent code review whose findings are labelled caused-by-this-change yes/no, settles every finding itself (stopping to ask only for a plan conflict, data risk, an explanation the re-reviewer rejects, or a re-review that is still not clean after three rounds), re-runs checks, writes the documentation, and hands off for /commit-change. Run on an existing working branch it continues that change instead. Never merges to the default branch.
 disable-model-invocation: true
 ---
 
@@ -12,6 +12,17 @@ The default branch, change prefix, checks, build command and version files come 
 Follow these steps in order. Stop where a step says STOP.
 
 **Document control:** once the plan is committed in step 3, the plan file is an approved document and is never edited again. Anything that differs from the plan is recorded in the review record (step 9), not in the plan.
+
+## Continue mode
+Run `git branch --show-current` on its own as a separate command first. If the current branch is not the default branch and `git log --grep "approved plan"` shows a `docs(<NUMBER>): approved plan` commit for that branch's change number, you are **continuing an existing change**, for example after `/commit-change` stopped on a failed review gate or after a stop case was answered. Say so in one line, then:
+- Skip steps 2 and 3. Do not create or switch branches, and do not touch the plan file. Run `git status` on its own; if there are uncommitted changes, show them and STOP.
+- Read the plan and the existing review record (`docs/reviews/<same file name as the plan>.md`) so you know what is open: failed gate items, unsettled findings, or whatever the user asked you to fix.
+- Do step 4 for those fixes only, then step 5.
+- Run the re-review loop in step 7 on the open items and the new fixes (the re-reviewer gets the diff of the new commits). Run the step 6 review as well only if the new work goes beyond fixing what was open, and give those reviewers the whole branch diff as usual.
+- Re-review rounds count across the whole change, not per run: if the record already shows three rounds and the last one wasn't clean, STOP and ask the user instead of starting another.
+- Do step 8, then in step 9 **append** to the existing review record: add a new round, and never rewrite or delete earlier rounds or findings. Do not add a second CHANGELOG entry; edit the existing one only if what the change does has changed. Then step 10.
+
+If the current branch is the default branch, or has no approved-plan commit, continue with step 1 as normal.
 
 ## 1. Find the plan
 - Use the plan written by `/plan-change` in this session.
@@ -53,17 +64,21 @@ The review is done by reviewers independent of you. You wrote the code, so you d
   - **Spec:** does the diff match the approved plan? Give it the plan file. It reports requirements that are missing or only partly done, behaviour that wasn't asked for, and requirements that look done but look wrong, quoting the plan line for each.
   - **Correctness:** is the code right? Depth by change type: `feat:` two angles, general correctness plus the most relevant second one (data integrity for schema changes, security for external input, and so on); `fix:` confirm the root cause was fixed and look for the same bug pattern elsewhere in the touched files; `refactor:` confirm behaviour didn't change.
 - Give each reviewer only the inputs for its own job, from this list: the diff command (`git diff <default branch>...HEAD`) and commit list, the plan file (Spec and Correctness), the standards files, including `docs/DECISIONS.md` (Standards), and the saved before-copy plus the file's path if the change edited a file outside the repository (they compare the two). Do not pass your own summary, reasoning or opinion of the code.
-- Each reviewer's brief requires every finding to have a severity, a one-line plain-English description, and the files involved. Severities: `[High]` data loss or corruption, a security hole, a crash, or a requirement plainly not met; `[Medium]` a real bug or a requirement only partly met in realistic use; `[Low]` a minor bug, an edge case, or a standards breach; `[Nit]` style or wording; `[Informational]` an observation that needs no action. Ask for under 400 words each.
+- Each reviewer's brief requires every finding to have a severity, a "Caused by this change: yes/no" label, a one-line plain-English description, and the files involved. Severities: `[High]` data loss or corruption, a security hole, a crash, or a requirement plainly not met; `[Medium]` a real bug or a requirement only partly met in realistic use; `[Low]` a minor bug, an edge case, or a standards breach; `[Nit]` style or wording; `[Informational]` an observation that needs no action. "Caused" means the problem is in what this change added or altered, or in behaviour it changed ("yes"); a problem that was already there and that this change neither added, altered nor changed the behaviour of is "no". Ask for under 400 words each.
 - Tell every reviewer that the review record and the CHANGELOG entry are written after the review (step 9), so they must not flag them as missing.
-- Collect the findings. Do not merge, rerank or re-rate them: the severity is the reviewer's, and the three lists stay separate.
+- Collect the findings. Do not merge, rerank or re-rate them: the severity and the caused label are the reviewer's, and the three lists stay separate.
 
 **Smell baseline** (Fowler; each is a labelled heuristic, never a hard violation): Mysterious Name; Duplicated Code; Feature Envy; Data Clumps; Primitive Obsession; Repeated Switches (the same switch or if-cascade on one type in several places); Shotgun Surgery (one change forces scattered edits); Divergent Change (one file edited for several unrelated reasons); Speculative Generality (abstraction for needs the plan doesn't have); Message Chains; Middle Man; Refused Bequest.
 
 ## 7. Settle the findings, check again, re-review
-Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in these three cases, each described below: (1) a fix would go against the approved plan, (2) a fix would touch the user's data, (3) the re-reviewer rejects an explanation.
+Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in these four cases, each described below: (1) a fix would go against the approved plan, (2) a fix would touch the user's data, (3) the re-reviewer rejects an explanation and you still disagree, (4) the third re-review round is still not clean.
 
-- Every finding ends in one of three places: **fixed**, **explained** (wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. A `[Medium]` or `[High]` finding can only be fixed or explained, never logged. Nothing is left unaccounted for.
-- Never change a reviewer's severity. If you think it's wrong, say so in the finding's disposition and keep the severity.
+You never have the last word on your own findings: every outcome other than plain "fixed" is checked by a fresh reviewer below.
+
+- Every finding ends in one of three places: **fixed**, **explained** ("not a real problem": wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. Nothing is left unaccounted for. What is allowed depends on the reviewer's "Caused by this change" label:
+  - **Caused: yes** — can only be fixed, or explained with a reason the re-reviewer accepts. It can never be logged, and never accepted as is.
+  - **Caused: no** — can be fixed, explained, or logged, at any severity. The re-reviewer confirms that "no" is true.
+- Never change a reviewer's severity or caused label. If you think either is wrong, say so in the finding's disposition and keep it as given. The only way to move a "yes" to "no" is to dispute it with an explanation, which counts as an explained outcome the re-reviewer must accept; until it accepts, the label stays "yes".
 - **Stop case 1, plan conflict:** if a fix would go against the approved plan, quote the plan's exact words, STOP and ask the user before acting.
 - **Stop case 2, data risk:** if a fix would edit a migration script, delete behaviour, import/export/backup code, or anything in `data/`, STOP and ask the user before acting, even if the fix matches the plan and whatever the finding's severity. If a `[Medium]` or `[High]` finding can't be fixed without hitting a stop case, the same applies.
 - When a stop case applies, record the question and the user's answer in the finding's disposition in the review record.
@@ -71,13 +86,19 @@ Settle every finding yourself. Do not stop to ask the user which to fix. Stop on
   - Automated test: run it and record Pass or Fail.
   - Manual check Claude can run itself (reading a file, running a command): run it and record Pass or Fail with "(checked by Claude)".
   - Manual check that needs the user at the app: record "Manual".
-  - A Fail is not a reviewer finding and carries no severity. It is settled like a `[High]` finding: it can only be fixed, never explained away or logged, with the same stop cases. A fixed Fail counts as a fixed `[High]` for the re-review below.
+  - A Fail is not a reviewer finding and carries no severity. It is always "caused: yes" and is settled like a `[High]` finding: it can only be fixed, never explained away or logged, with the same stop cases.
 - Run every check from step 5 again. All must pass. Re-run any requirement test that failed.
-- **Re-review (once):** if any `[Medium]` or `[High]` finding was raised (each is fixed or explained), or a Fail was fixed, launch one fresh reviewer (same rules as step 6) and give it the plan, the standards, the diff of the fixes, and your explanations. It checks the fixes and says whether it accepts each explanation.
-  - **Stop case 3:** if it doesn't accept an explanation, STOP and ask the user.
-  - Settle its other findings the same way as above, with the same stop cases, and run the checks again if you fixed anything. There is no second re-review, so say in the hand-off that those fixes and explanations were not re-checked by a reviewer.
+- **Re-review (a loop, at most three rounds):** after the first review is settled, if any outcome is anything other than plain "fixed" (an explanation, a logged item, a disputed label), at any severity, launch one fresh reviewer (same rules as step 6, a new one each round). Give it the plan, the standards, the diff of the fixes, and for each finding its label, your outcome and your reasoning. It must:
+  - check every explanation and say whether it accepts it,
+  - check every logged item and confirm the "caused: no" label is true,
+  - check every fix (including fixed Fails) and say whether it really resolves the finding without breaking anything,
+  - label every new finding it raises "caused: yes/no" and give it a severity, like step 6.
+  - Settle its findings and any rejections the same way as above, with the same stop cases, and run the checks again if you fixed anything.
+  - **A rejected explanation:** fix the problem, or log it if this change didn't cause it (the re-reviewer must confirm that). If you still disagree after that, **stop case 3**: STOP and ask the user, quoting the reviewer's rejection and your reason.
+  - **Another round:** the round is clean when every outcome in it is plain "fixed" or an outcome the re-reviewer accepted, and it raised no new finding left unsettled. If a round isn't clean, run the next round with a new fresh reviewer, which checks everything from that round's fixes, explanations and logged items. Keep going until a round is clean.
+  - **Stop case 4:** if the third re-review round is still not clean, STOP and show the user every item that is still open.
 - **By-design decisions:** when a finding is explained as by design, add the decision and its reason to `docs/DECISIONS.md` as an entry with this change's number and today's date, unless the same decision is already there (if the file doesn't exist, create it with a `# Design decisions` title, one line saying what the file is for, and the entry format: a heading with the decision, then Change, Date and Reason lines). If the re-reviewer later rejects the explanation, revise or remove the entry according to the user's answer. An observation that isn't a decision is explained in the review record only, never in `docs/DECISIONS.md`. Commit the entry with the records in step 9.
-- Note each finding with its reviewer-assigned severity and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
+- Note each finding with its reviewer-assigned severity and caused label, where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and what the re-reviewer said about it, and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
 
 ## 8. Confirm the plan is untouched
 - Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
@@ -94,21 +115,23 @@ If the plan itself is a documentation change (for example rewriting, moving, arc
 # Review: <NUMBER> — <plan title>
 
 - **Change:** <NUMBER>
+- **Review format:** accountability
 - **Plan:** docs/plans/<plan file name> (approved in commit <short hash of the plan commit>)
 - **Branch:** <branch name>
 - **Reviewer:** <the independent reviewers (Standards, Spec, Correctness) and whether a re-review ran>
 - **Scope:** diff of <branch> against <default branch> — <files changed>, about <N> lines (plus any file outside the repository that the change edited, with its saved copy)
 
 ## Findings
-Every finding is listed, with the severity the reviewer assigned (never changed by the author).
+Every finding is listed, with the severity and caused label the reviewer assigned (never changed by the author). Findings raised by a re-review are listed here too, marked with the round that raised them.
 
 - **[Severity]** <one-line description> — <files>
+  **Caused by this change:** yes | no
   **Disposition:** fixed (how) | explained (why) | logged in KNOWN_ISSUES.md
   <If a stop case applied, add the question asked and the user's answer.>
-  <If the author disagreed with the severity, add a line saying so and why. The severity above stays as given.>
+  <If the author disagreed with the severity or the label, add a line saying so and why. The severity and label above stay as given.>
 
 ## Re-review
-<Only if one ran: which findings triggered it, what the re-reviewer found, whether it accepted each explanation, and how its findings were settled. Leave this section out if no re-review ran.>
+<Only if any ran. One subsection per round, in order: "### Round 1", "### Round 2", "### Round 3". Each says what triggered it, what the re-reviewer checked, whether it accepted each explanation, confirmed each logged item's "caused: no" label and accepted each fix, its new findings (with severity and caused label) and how they were settled, and whether the round was clean. Later runs append rounds and never rewrite earlier ones. Leave this section out if no re-review ran.>
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -142,7 +165,7 @@ Do not add new entries to `docs/archive/PEER_REVIEW.md`; it is the archive of ol
 ## 10. Hand off
 Tell the user in plain English:
 - The change number and what was built.
-- The review findings, first: one plain-English line for every finding, giving its severity, what was found, and what was done (fixed; explained and why; or logged). Never give counts or groups in place of the list. Then say any time you stopped to ask the user and what they answered. If the re-reviewer or anything else left something open, say so plainly.
+- The review findings, first: one plain-English line for every finding, giving its severity, whether this change caused it, what was found, and what was done (fixed; explained and why; or logged), including findings from every re-review round and whether the re-reviewer accepted each outcome. Never give counts or groups in place of the list. Then say how many re-review rounds ran, any time you stopped to ask the user and what they answered. If the re-reviewer or anything else left something open, say so plainly.
 - Which documents you created or changed, and why, so they can read them before checking in.
 - What to test by hand, after the review summary: list every numbered test (T1, T2, …) from the plan's "How you'll check it", in full, and next to each one show the trace-table results of the requirements it covers, so the user can see which ones Claude already checked.
 - Whether there is a new migration. If so, remind them to take the steps in CLAUDE.md's "Backup before a migration" line before running it (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until it's run.

@@ -1,6 +1,6 @@
 ---
 name: commit-change
-description: Last step of the workflow, run by the user after /code-change. Verifies the records, catches the branch up with the default branch, merges the branch into the default branch, pushes, deletes the branch, and reports. Never writes the change records itself, except for review notes on code changed while resolving a merge conflict.
+description: Last step of the workflow, run by the user after /code-change. Verifies the records (checking a new-format review record against the review-accountability gate and stopping with a plain-English list of failures), catches the branch up with the default branch, merges the branch into the default branch, pushes, deletes the branch, and reports. Never writes the change records itself, except for review notes on code changed while resolving a merge conflict.
 disable-model-invocation: true
 ---
 
@@ -25,6 +25,19 @@ Find the plan for this branch in `docs/plans/` (its change number is in the bran
 - The plan is untouched since it was approved: `git diff <approved-plan commit> -- <plan file>` shows no changes. The approved-plan commit is the one whose message is `docs(<NUMBER>): approved plan` (find it with `git log --grep`); never use "the first commit on the branch", which is ambiguous once the default branch has been merged in.
 
 If anything is missing or the plan changed, STOP and tell the user exactly what's wrong. Do not write or fix the records yourself; that is `/code-change`'s job.
+
+### Review gate
+Read the review record. The gate applies only to a record in the new format: one with a `- **Review format:** accountability` line in its header, or with any "Caused by this change" line anywhere in it (so deleting the marker doesn't dodge the gate). A record with neither is in the old format and is exempt; say so in one line and go on to step 3.
+
+For a new-format record, check every rule below. Collect all failures before stopping, not just the first.
+1. **Labels:** every finding has a severity and a "Caused by this change: yes/no" line, and a disposition.
+2. **Caused findings:** no finding labelled "yes" has the disposition "logged in KNOWN_ISSUES.md", and none is left open or "accepted as is". Each is "fixed" or "explained".
+3. **Re-review happened:** if any finding's disposition is anything other than plain "fixed" (including any logged item or any disputed label), the record has a Re-review section.
+4. **Everything was checked:** in the last re-review round, every explanation is marked accepted by the re-reviewer, every logged item has its "caused: no" label confirmed, and every fix is marked accepted. A rejected explanation counts as a failure unless the record shows it was then fixed, or logged with the label confirmed, in a later round, or settled by the user's answer.
+5. **The loop finished:** the last round is marked clean, and there are no more than three rounds. A third round that isn't clean, or any finding with no disposition, is a failure.
+6. **Failed requirements:** no row in the requirements trace is Fail.
+
+If any rule fails, STOP and list every failure in plain English, one line each, naming the finding or requirement. Tell the user that running `/code-change` on this branch will continue the change (fix, re-run the checks, re-review and append to the record). Do not merge, push or write anything.
 
 ## 3. Read the decisions from the plan
 The plan's Check-in section already settled these. Do NOT ask the user again:
@@ -55,6 +68,7 @@ Tell the user in plain English:
 
 ## Never
 - Merge without completing steps 1–4.
+- Merge a new-format change whose review record fails the review gate in step 2.
 - Write or change the plan, the review record, or the CHANGELOG entry. The one exception is the merge-conflict section in step 4. If anything else is wrong, STOP and say so.
 - Rebase.
 - Push any branch other than the default branch, or force-push anything.
