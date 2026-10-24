@@ -100,7 +100,7 @@ You never have the last word on your own findings: every outcome, including ever
   - **Another round:** a round is clean only when every outcome in it is accepted by the re-reviewer and it raised **no new finding at all**. A new finding, even one you then fix at once, makes the round not clean, so that fix is checked by the next round. If a round isn't clean, run the next round with a new fresh reviewer, which checks everything from that round's fixes, explanations and logged items. Keep going until a round is clean.
   - **Stop case 4:** if the last permitted re-review round (the third, or an extra round the user authorised) is still not clean, STOP and show the user every item that is still open. Settle each open item according to the user's answer and record, under that item, the question and the answer as "Settled by the user: <answer>". The user's answer is the final word on those items, the gate accepts it in place of a clean round, and no further round is run unless the user asks for one.
 - **By-design decisions:** when a finding is explained as by design, add the decision and its reason to `docs/DECISIONS.md` as an entry with this change's number and today's date, unless the same decision is already there (if the file doesn't exist, create it with a `# Design decisions` title, one line saying what the file is for, and the entry format: a heading with the decision, then Change, Date and Reason lines). If the re-reviewer later rejects the explanation, revise or remove the entry according to the user's answer. An observation that isn't a decision is explained in the review record only, never in `docs/DECISIONS.md`. Commit the entry with the records in step 9.
-- Note each finding with its reviewer-assigned severity and caused label, where it ended up (fixed and how; explained and why; or logged in BACKLOG.md), and what the re-reviewer said about it, and anything that now differs from the plan. These go in the review record in step 9. Add an entry to `docs/BACKLOG.md` for every finding you log, in its format (a `## <title>` heading, then Found in, Severity, Files and What's wrong lines); if the file doesn't exist, create it with that format described at its top.
+- Note each finding with its reviewer-assigned severity and caused label, where it ended up (fixed and how; explained and why; or logged in docs/BACKLOG.md), and what the re-reviewer said about it, and anything that now differs from the plan. These go in the review record in step 9. Add an entry to `docs/BACKLOG.md` for every finding you log, in its format (a `## <title>` heading, then Found in, Severity, Files and What's wrong lines); if the file doesn't exist, create it with that format described at its top.
 
 ## 8. Confirm the plan is untouched
 - Run `git diff <approved-plan commit> -- <plan file>` (the commit whose message is `docs(<NUMBER>): approved plan`). It must show no changes.
@@ -128,7 +128,7 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 
 - **[Severity]** <one-line description> — <files>
   **Caused by this change:** yes | no
-  **Disposition:** fixed (how) | explained (why) | logged in BACKLOG.md
+  **Disposition:** fixed (how) | explained (why) | logged in docs/BACKLOG.md
   <If a stop case applied, add the question asked and the user's answer.>
   <If the author disagreed with the severity or the label, add a line saying so and why. The severity and label above stay as given.>
 
