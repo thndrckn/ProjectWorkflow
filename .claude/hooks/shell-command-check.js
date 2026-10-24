@@ -270,17 +270,52 @@ function worktreeDestOk(raw) {
   return worktreeMode || ignoredInMain(path.posix.normalize(n));
 }
 
+// git's global options (before the subcommand). Those that take a value, and those that
+// don't; git matches these names exactly, so there are no abbreviations to allow for.
+const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--config-env', '--attr-source']);
+const GLOBAL_FLAGS = new Set([
+  '-v', '--version', '-h', '--help', '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects',
+  '--no-lazy-fetch', '--no-optional-locks', '--no-advice', '--bare', '--literal-pathspecs',
+  '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--exec-path', '--html-path',
+  '--man-path', '--info-path', '--list-cmds',
+]);
+
+// Splits the leading global options off a git command. Returns the options as
+// [name, value] pairs, whether any option wasn't recognised, and where the subcommand is.
+// Attached forms (-C/path, -ckey=value, --git-dir=path) are split the same way.
+function parseGlobals(args) {
+  const opts = [];
+  let unknown = false;
+  let i = 0;
+  while (i < args.length && args[i].startsWith('-')) {
+    const a = args[i];
+    const eq = a.startsWith('--') ? a.indexOf('=') : -1;
+    const name = eq > 0 ? a.slice(0, eq) : a;
+    if (GLOBAL_WITH_VALUE.has(name)) {
+      if (eq > 0) { opts.push([name, a.slice(eq + 1)]); i += 1; }
+      else { opts.push([name, args[i + 1] || '']); i += 2; }
+    } else if (/^-C./.test(a)) {
+      opts.push(['-C', a.slice(2)]); i += 1;
+    } else if (/^-c./.test(a)) {
+      opts.push(['-c', a.slice(2)]); i += 1;
+    } else {
+      if (!GLOBAL_FLAGS.has(name)) unknown = true;
+      i += 1;
+    }
+  }
+  return { opts, unknown, next: i };
+}
+
 // In a worktree, true when a git global option points git at the main folder (-C,
-// --git-dir, --work-tree) or could move its working tree (-c core.worktree / core.bare),
-// or at something that can't be resolved, so the master rules apply to the command.
-function redirectsIntoMain(opts) {
-  for (let i = 0; i < opts.length; i++) {
-    const a = opts[i];
-    if (a === '-c' && /^core\.(worktree|bare)=/i.test(stripQuotes(opts[i + 1] || ''))) return true;
-    let v = null;
-    if (a === '-C' || a === '--git-dir' || a === '--work-tree') v = opts[i + 1];
-    else if (a.startsWith('--git-dir=') || a.startsWith('--work-tree=')) v = a.slice(a.indexOf('=') + 1);
-    if (v !== null && v !== undefined && pointsIntoMain(v)) return true;
+// --git-dir, --work-tree) or could move its working tree (-c / --config-env on
+// core.worktree or core.bare), at something that can't be resolved, or isn't recognised,
+// so the master rules apply to the command.
+function redirectsIntoMain({ opts, unknown }) {
+  if (unknown) return true;
+  for (const [name, value] of opts) {
+    const v = stripQuotes(value);
+    if ((name === '-c' || name === '--config-env') && /^core\.(worktree|bare)\b/i.test(v)) return true;
+    if ((name === '-C' || name === '--git-dir' || name === '--work-tree') && pointsIntoMain(v)) return true;
   }
   return false;
 }
@@ -314,19 +349,26 @@ function worktreeRefRule(sub, rest) {
       if (DEFAULT_BRANCHES.includes(dst)) return 'git push to the default branch from a worktree';
     }
   }
+  if (sub === 'fetch') {
+    // fetch <remote> <src>:<dst> updates a local branch; with -u/--update-head-ok that can
+    // be the checked-out default branch. Plain `fetch origin master` only updates origin/master.
+    for (const r of nonOpt.slice(1)) {
+      if (!r.includes(':')) continue;
+      if (DEFAULT_BRANCHES.includes(r.replace(/^\+/, '').split(':').pop())) return 'git fetch into the default branch from a worktree';
+    }
+  }
+  if (sub === 'config' && nonOpt.length >= 2 && /^core\.(worktree|bare)$/i.test(nonOpt[0])) {
+    return 'git config core.worktree / core.bare could redirect git for every worktree';
+  }
   return null;
 }
 
 function gitCheck(args) {
-  let i = 0;
-  while (i < args.length && args[i].startsWith('-')) {
-    const a = args[i];
-    if (a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree') i += 2;
-    else i += 1;
-  }
+  const globals = parseGlobals(args);
+  const i = globals.next;
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
-  if (worktreeMode && !redirectsIntoMain(args.slice(0, i))) {
+  if (worktreeMode && !redirectsIntoMain(globals)) {
     // Git inside the worktree is free, apart from the few commands that reach the default
     // branch or other worktrees; those get the extra rules above, and worktree its own below.
     const why = worktreeRefRule(sub, rest);

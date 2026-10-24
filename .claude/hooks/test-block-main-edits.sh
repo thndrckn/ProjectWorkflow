@@ -156,12 +156,19 @@ for c in "GIT_DIR=$master/.git git reset --hard" "GIT_WORK_TREE=$master git rese
   'git update-ref refs/heads/master HEAD' 'git worktree remove --force x' 'git worktree remove --forc x' \
   'git push origin HEAD:master' 'git push origin master' 'git push origin +HEAD:main' 'git push --mirror' \
   "cd $master && sed -i s/a/b/ README.md" "pushd $master; touch a" "Set-Location $master" "cd '$master'" \
-  'cd ..' 'cd ../../..' 'cd $HOME2' "git -C $master/src reset --hard" 'git -C .. commit -m x'; do
+  'cd ..' 'cd ../../..' 'cd $HOME2' "git -C $master/src reset --hard" 'git -C .. commit -m x' \
+  "git -C$master reset --hard" "git -ccore.worktree=$master reset --hard" \
+  'git --config-env=core.worktree=X reset --hard' "git --namespace foo -C $master reset --hard" \
+  'git --namespace foo update-ref -d refs/heads/master' 'git --unknown-flag commit -m x' \
+  'git fetch -u . HEAD:master' 'git fetch --update-head-ok . HEAD:main' \
+  "git config core.worktree $master" 'git config --local core.bare true'; do
   bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
 done
 for c in 'git push -u origin chore/ABC-001-w' 'git push' 'git branch -d other' 'git branch --show-current' \
   'git worktree list' "cd $wt/src && touch x" 'cd src' 'cd -' "git -C $wt log" "GIT_DIR=$wt/.git git status" \
-  "echo hi > $wt2/x.txt" "git -C $wt2 commit -m x"; do
+  "echo hi > $wt2/x.txt" "git -C $wt2 commit -m x" 'git --no-pager log' 'git -c user.name=x commit -m x' \
+  'git -cuser.name=x commit -m x' 'git fetch origin' 'git fetch origin master' 'git config user.name x' \
+  'git config core.worktree' 'git --namespace foo status'; do
   bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
 done
 for t in Edit Write; do
