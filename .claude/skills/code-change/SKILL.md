@@ -76,7 +76,7 @@ Settle every finding yourself. Do not stop to ask the user which to fix. Stop on
 - **Re-review (once):** if any `[Medium]` or `[High]` finding was raised (each is fixed or explained), or a Fail was fixed, launch one fresh reviewer (same rules as step 6) and give it the plan, the standards, the diff of the fixes, and your explanations. It checks the fixes and says whether it accepts each explanation.
   - **Stop case 3:** if it doesn't accept an explanation, STOP and ask the user.
   - Settle its other findings the same way as above, with the same stop cases, and run the checks again if you fixed anything. There is no second re-review, so say in the hand-off that those fixes and explanations were not re-checked by a reviewer.
-- **By-design decisions:** when a finding is explained as by design, add the decision and its reason to `docs/DECISIONS.md` as an entry with this change's number and today's date, unless the same decision is already there (create the file with a header and entry format if it doesn't exist). An observation that isn't a decision is explained in the review record only, never in `docs/DECISIONS.md`. Commit the entry with the records in step 9.
+- **By-design decisions:** when a finding is explained as by design, add the decision and its reason to `docs/DECISIONS.md` as an entry with this change's number and today's date, unless the same decision is already there (if the file doesn't exist, create it with a `# Design decisions` title, one line saying what the file is for, and the entry format: a heading with the decision, then Change, Date and Reason lines). If the re-reviewer later rejects the explanation, revise or remove the entry according to the user's answer. An observation that isn't a decision is explained in the review record only, never in `docs/DECISIONS.md`. Commit the entry with the records in step 9.
 - Note each finding with its reviewer-assigned severity and where it ended up (fixed and how; explained and why; or logged in KNOWN_ISSUES.md), and anything that now differs from the plan. These go in the review record in step 9. Add an entry to KNOWN_ISSUES.md for every finding you log.
 
 ## 8. Confirm the plan is untouched
@@ -135,6 +135,7 @@ Always call out a new migration. Don't repeat the review findings; the review re
 - **CLAUDE.md**: something Claude needs to know next time (a new module, table, rule, or convention).
 - **README.md**: something a user would notice (a new feature, a new setup or run step).
 - **KNOWN_ISSUES.md**: every finding logged there in step 7, so it isn't forgotten.
+- **docs/DECISIONS.md**: every by-design decision recorded in step 7. Commit it with these records.
 
 Do not add new entries to `docs/archive/PEER_REVIEW.md`; it is the archive of older reviews.
 
