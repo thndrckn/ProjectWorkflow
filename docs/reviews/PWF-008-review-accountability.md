@@ -118,7 +118,7 @@ Additions the review led to, beyond the plan's wording, none contradicting it. A
 - Correction lines for fixing a record without rewriting it.
 - A round is clean only if it raised no new finding at all.
 - A fixed requirement Fail triggers a re-review, and is recorded as "Pass (fixed after Fail)".
-- Added in later rounds, not yet listed above: any round beyond the third needs the user's authorisation (recorded as "Settled by the user: <answer>"); every stop-case answer is recorded with that phrase; stop case 4 covers the last permitted round and a needed extra round; re-reviewers are exempt from the "no author reasoning" input rule. These came from re-review findings and are recorded in the Re-review section; the user has not yet been asked to accept them as deviations.
+- Added in later rounds, not yet listed above: any round beyond the third needs the user's authorisation (recorded as "Settled by the user: <answer>"); every stop-case answer is recorded with that phrase; stop case 4 covers the last permitted round and a needed extra round; re-reviewers are exempt from the "no author reasoning" input rule. These came from re-review findings and are recorded in the Re-review section; the user has read and accepted these four as deviations.
 - Continue-mode edge cases: no record yet, an old-format record, and a stricter rule for when new work gets the full review.
 - The plan allowed a CLAUDE.md line "only if needed"; one line about continue mode was added to the Workflow section.
 
