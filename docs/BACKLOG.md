@@ -11,9 +11,3 @@ Entry format:
 - **Files:** <files involved>
 - **What's wrong:** <plain English>
 ```
-
-## rename-plan.sh and plansDirectory are inert while plan mode is blocked
-- **Found in:** PWF-001
-- **Severity:** Nit
-- **Files:** `.claude/hooks/rename-plan.sh`, `.claude/settings.json`
-- **What's wrong:** The rename-plan hook runs after `ExitPlanMode`, and `plansDirectory` only matters to plan mode. Plan mode is blocked, so neither does anything today. They were kept because the approved plan said to keep them; the review suggested deleting them, which was declined because it contradicts the plan. Remove them in a later change if plan mode is never coming back.

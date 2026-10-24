@@ -1,5 +1,4 @@
 {
-  "plansDirectory": "./docs/plans",
   "hooks": {
     "PreToolUse": [
       {
@@ -12,14 +11,6 @@
         "matcher": "EnterPlanMode",
         "hooks": [
           { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-plan-mode.sh\"" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "ExitPlanMode",
-        "hooks": [
-          { "type": "command", "command": "bash .claude/hooks/rename-plan.sh" }
         ]
       }
     ]
