@@ -1,6 +1,9 @@
 // Decides whether a Bash/PowerShell command may run while on master/main.
-// Called by block-main-edits.sh with the PreToolUse JSON on stdin and the
-// project directory (e.g. /d/projects/foo or D:\Projects\Foo) as argv[2].
+// Called by block-main-edits.sh with the PreToolUse JSON on stdin and, as arguments:
+//   argv[2]  the main folder (e.g. /d/projects/foo or D:\Projects\Foo)
+//   argv[3]  'master' or 'worktree' (see worktreeMode below)
+//   argv[4]  the main folder in a form git itself understands (for git check-ignore)
+//   argv[5+] the paths of the repository's other worktrees, which are not guarded
 // Prints "allow" or "block: <reason>".
 //
 // This is best-effort pattern matching, not a sandbox. It does not look inside
@@ -8,9 +11,12 @@
 // anything built from variables. A path it cannot resolve counts as inside the
 // project, so it is blocked.
 
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const proj = normPath(process.argv[2] || '');
+const projForGit = process.argv[4] || '';
+const otherWorktrees = process.argv.slice(5).map(normPath);
 // 'worktree' when the command runs inside a worktree of this project while the main
 // folder (proj) is on master: the worktree's own files are free to change, and only the
 // main folder is protected. Anything else is 'master': proj is the folder being guarded.
@@ -81,11 +87,34 @@ function isPlanFile(n) {
   return !n.startsWith('/') && n.replace(/^\.\//, '').startsWith('docs/plans/');
 }
 
-// True when an absolute, normalised path is inside the guarded main folder. Worktrees live
-// under its .claude/worktrees/ and are judged by their own branch, so they don't count.
+// True when an absolute, normalised path is inside the guarded main folder. The
+// repository's other worktrees (which may sit inside it) are judged by their own branch,
+// so they don't count.
 function inMain(n) {
   if (n !== proj && !n.startsWith(proj + '/')) return false;
-  return !n.startsWith(proj + '/.claude/worktrees/');
+  return !otherWorktrees.some((w) => n === w || n.startsWith(w + '/'));
+}
+
+// In a worktree, true when a path points at the main folder or at something that can't be
+// resolved from the text (a variable, or a '..' that might climb into it).
+function pointsIntoMain(raw) {
+  const w = stripQuotes(raw);
+  if (w === '') return false;
+  if (/[$%`]/.test(w) || w.includes('..')) return true;
+  const n = normPath(w);
+  return n.startsWith('/') && inMain(path.posix.normalize(n));
+}
+
+// True when git ignores this path inside the main folder (so a checkout there can't land
+// in the tracked tree). Any failure counts as not ignored.
+function ignoredInMain(rel) {
+  if (!projForGit) return false;
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--', rel], { cwd: projForGit, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // True when writing to this path is allowed on master.
@@ -226,21 +255,66 @@ function destructiveGitFlag(sub, rest) {
   return null;
 }
 
-// In a worktree, true when a git global option (-C, --git-dir, --work-tree) points at the
-// main folder, or at something that can't be resolved, so the master rules apply to it.
+// True when a new worktree may be created at this path.
+function worktreeDestOk(raw) {
+  const w = stripQuotes(raw);
+  if (w === '' || /[$%`]/.test(w)) return false;
+  let n = normPath(w);
+  if (n.startsWith('/')) {
+    n = path.posix.normalize(n);
+    if (n !== proj && !n.startsWith(proj + '/')) return true; // outside the project
+    return n !== proj && ignoredInMain(n.slice(proj.length + 1));
+  }
+  if (w.includes('..')) return false;
+  // Relative: inside the main folder on master, and inside the worktree in a worktree.
+  return worktreeMode || ignoredInMain(path.posix.normalize(n));
+}
+
+// In a worktree, true when a git global option points git at the main folder (-C,
+// --git-dir, --work-tree) or could move its working tree (-c core.worktree / core.bare),
+// or at something that can't be resolved, so the master rules apply to the command.
 function redirectsIntoMain(opts) {
   for (let i = 0; i < opts.length; i++) {
     const a = opts[i];
+    if (a === '-c' && /^core\.(worktree|bare)=/i.test(stripQuotes(opts[i + 1] || ''))) return true;
     let v = null;
     if (a === '-C' || a === '--git-dir' || a === '--work-tree') v = opts[i + 1];
     else if (a.startsWith('--git-dir=') || a.startsWith('--work-tree=')) v = a.slice(a.indexOf('=') + 1);
-    if (v === null || v === undefined) continue;
-    const w = stripQuotes(v);
-    if (/[$%`]/.test(w) || w.includes('..')) return true;
-    const n = normPath(w);
-    if (n.startsWith('/') && inMain(path.posix.normalize(n))) return true;
+    if (v !== null && v !== undefined && pointsIntoMain(v)) return true;
   }
   return false;
+}
+
+// Git accepts any unambiguous prefix of a long option (--forc for --force).
+function isLong(a, full) {
+  const name = a.split('=')[0];
+  return name.length > 2 && name.startsWith('--') && full.startsWith(name);
+}
+
+function isForce(rest) {
+  return rest.some((a) => isLong(a, '--force') || (/^-[a-zA-Z]+$/.test(a) && a.includes('f')));
+}
+
+const DEFAULT_BRANCHES = ['master', 'main', 'refs/heads/master', 'refs/heads/main'];
+
+// In a worktree, the commands that could still reach the default branch, whose work
+// lives in the main folder, even though git itself runs inside the worktree.
+function worktreeRefRule(sub, rest) {
+  const nonOpt = rest.filter((a) => !a.startsWith('-'));
+  if (sub === 'update-ref') return 'git update-ref could move the default branch from a worktree';
+  if (sub === 'branch') {
+    const changes = rest.some((a) => isLong(a, '--force') || isLong(a, '--move') || isLong(a, '--delete')
+      || isLong(a, '--copy') || /^-[a-zA-Z]*[fMmDdCc]/.test(a));
+    if (changes && nonOpt.some((a) => DEFAULT_BRANCHES.includes(a))) return 'git branch changing the default branch from a worktree';
+  }
+  if (sub === 'push') {
+    if (rest.some((a) => isLong(a, '--mirror'))) return 'git push --mirror from a worktree';
+    for (const r of nonOpt.slice(1)) {
+      const dst = r.replace(/^\+/, '').split(':').pop();
+      if (DEFAULT_BRANCHES.includes(dst)) return 'git push to the default branch from a worktree';
+    }
+  }
+  return null;
 }
 
 function gitCheck(args) {
@@ -250,9 +324,15 @@ function gitCheck(args) {
     if (a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree') i += 2;
     else i += 1;
   }
-  if (worktreeMode && !redirectsIntoMain(args.slice(0, i))) return null; // git inside the worktree is free
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
+  if (worktreeMode && !redirectsIntoMain(args.slice(0, i))) {
+    // Git inside the worktree is free, apart from the few commands that reach the default
+    // branch or other worktrees; those get the extra rules above, and worktree its own below.
+    const why = worktreeRefRule(sub, rest);
+    if (why) return why;
+    if (sub !== 'worktree') return null;
+  }
   if (sub === '') return null;
   if (rest.some((a) => a.startsWith('--output'))) return `git ${sub} --output writes a file`;
   const destructive = destructiveGitFlag(sub, rest);
@@ -281,10 +361,20 @@ function gitCheck(args) {
       // checked out twice or a dirty worktree be thrown away; -B resets an existing branch.
       const verb = nonOpt[0];
       if (verb === 'list') return null;
-      const force = rest.some((a) => a === '--force' || (/^-[a-zA-Z]+$/.test(a) && a.includes('f')));
+      const force = isForce(rest);
       if (verb === 'remove') return force ? 'forced git worktree remove' : null;
       if (verb === 'add') {
-        return force || rest.some((a) => /^-[a-zA-Z]*B/.test(a)) ? 'forced git worktree add' : null;
+        if (force || rest.some((a) => /^-[a-zA-Z]*B/.test(a))) return 'forced git worktree add';
+        // The new checkout may not land in the project's tracked tree: inside the main
+        // folder it has to be a path git ignores.
+        let dest = null;
+        const args2 = rest.slice(rest.indexOf('add') + 1);
+        for (let k = 0; k < args2.length; k++) {
+          if (args2[k] === '-b') { k++; continue; }
+          if (!args2[k].startsWith('-')) { dest = args2[k]; break; }
+        }
+        if (dest === null) return 'git worktree add without a path is not allowed';
+        return worktreeDestOk(dest) ? null : `git worktree add ${dest} would put a checkout inside the project`;
       }
       return verb ? `git worktree ${verb} is not allowed` : 'git worktree without a subcommand is not allowed';
     }
@@ -347,15 +437,40 @@ function commandIndex(ws) {
   }
 }
 
+// Commands that change the shell's directory. This checker doesn't follow the directory,
+// so in a worktree they may not point into the main folder: relative writes after one
+// would land there.
+const CD_COMMANDS = new Set(['cd', 'chdir', 'pushd', 'set-location', 'sl', 'push-location']);
+
+// In a worktree, a word that points git at the main folder through the environment
+// (GIT_DIR=..., GIT_WORK_TREE=..., export GIT_DIR=..., $env:GIT_DIR = '...').
+function gitEnvIntoMain(ws) {
+  for (let k = 0; k < ws.length; k++) {
+    const w = stripQuotes(ws[k]);
+    const m = w.match(/^(?:\$env:)?GIT_(?:DIR|WORK_TREE)=(.*)$/i);
+    if (m && pointsIntoMain(m[1])) return true;
+    if (/^\$env:GIT_(?:DIR|WORK_TREE)$/i.test(w) && pointsIntoMain(ws[k + 2] || '')) return true;
+  }
+  return false;
+}
+
 function segmentCheck(words, depth) {
   const { words: ws, targets } = splitRedirects(words);
   for (const t of targets) {
     if (!destOk(t)) return `redirect to ${stripQuotes(t)}`;
   }
+  if (worktreeMode && gitEnvIntoMain(ws)) return 'git pointed at the main folder through the environment';
   const i = commandIndex(ws);
   if (i >= ws.length) return null;
   const name = stripQuotes(ws[i]).replace(/\\/g, '/').split('/').pop().toLowerCase().replace(/\.exe$/, '');
   const args = ws.slice(i + 1);
+
+  if (worktreeMode && CD_COMMANDS.has(name)) {
+    for (const d of destinations('first-path', args)) {
+      if (pointsIntoMain(d)) return `${name} into the main folder`;
+    }
+    return null;
+  }
 
   if (name === 'git') return gitCheck(args);
 

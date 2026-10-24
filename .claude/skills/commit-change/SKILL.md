@@ -14,7 +14,7 @@ The user typing `/commit-change` is their go-ahead. Follow these steps in order,
 
 ## 1. Safety checks
 A change is normally coded in its own worktree, and `/commit-change` is typed in the same chat. Steps 1 to 4 run inside the worktree; step 5 steps back out to the default branch's folder.
-- Confirm you are on a working branch, not the default branch. If you are on the default branch, look for the change to check in: if the user named one, or exactly one worktree is in flight (`git worktree list`), enter that worktree with `EnterWorktree` and its `path` and carry on; if there are several and none was named, ask which, in the question box. If there is none, STOP and tell the user there is nothing to check in.
+- Confirm you are on a working branch, not the default branch. If you are on the default branch, look for the change to check in: if the user gave a change number as an argument (for example `/commit-change ABC-085`) or otherwise named one, or exactly one worktree is in flight (`git worktree list`), enter that worktree with `EnterWorktree` and its `path` and carry on; if there are several and none was named, ask which, in the question box. If there is none, STOP and tell the user there is nothing to check in.
 - Confirm the branch has commits that the default branch doesn't (`git log <default>..HEAD --oneline`). If not, STOP.
 - Confirm there are no uncommitted changes. If there are, show them and STOP.
 - Fetch from GitHub and confirm the default branch matches `origin/<default>`. If it doesn't, STOP and tell the user in plain English.
@@ -47,6 +47,8 @@ The plan's Check-in section already settled these. Do NOT ask the user again:
 
 Tell the user in one line what's about to happen, for example:
 > "Checking in ABC-085, per the plan."
+
+If the change is in a worktree, add that the worktree is deleted at the end with everything inside it (its own installed packages, build folder and data folder), so anything entered in the app running there is gone. Typing `/commit-change` is their go-ahead, so say it as a plain heads-up. If the user has said anywhere in the chat that they want something kept from that app's data, STOP and ask before going on.
 
 ## 4. Catch up with the default branch
 Only needed if the default branch has commits the working branch doesn't (`git log HEAD..<default> --oneline` is not empty). If it is empty, skip this step.

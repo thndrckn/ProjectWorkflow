@@ -78,7 +78,17 @@ if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
   # (and /tmp paths); turn that off for the project path and give node a Windows-form
   # script path (cygpath -m) so it can still find the checker.
   here=$(cygpath -m "$(dirname "$0")" 2>/dev/null || dirname "$0")
-  verdict=$(printf '%s' "$input" | MSYS2_ARG_CONV_EXCL="*" node "$here/shell-command-check.js" "$p" "$mode" 2>/dev/null)
+  # The repository's other worktrees (they may sit inside the main folder) are judged by
+  # their own branch, so the checker is told which paths they are; asking git avoids
+  # hardcoding where a project keeps them.
+  others=()
+  while IFS= read -r w; do
+    [ -n "$w" ] || continue
+    w=$(cygpath -u "$w" 2>/dev/null || printf '%s' "$w")
+    [ "$(norm "$w")" = "$(norm "$p")" ] || others+=("$w")
+  done < <(git -C "$main_root" worktree list --porcelain 2>/dev/null | tr -d '\r' | sed -n 's/^worktree //p')
+  pgit=$(cygpath -m "$p" 2>/dev/null || printf '%s' "$p")
+  verdict=$(printf '%s' "$input" | MSYS2_ARG_CONV_EXCL="*" node "$here/shell-command-check.js" "$p" "$mode" "$pgit" "${others[@]}" 2>/dev/null)
   case "$verdict" in
     allow) exit 0 ;;
     *)
