@@ -79,7 +79,7 @@ One re-review ran, because three Medium findings were raised. It checked the fix
 ## Deviations from the plan
 **Approved by the user, contradicting the plan's R4:** R4 re-checks only when a finding "ended as something other than plain fixed". The user decided that any fix triggers the re-review, so every fix is independently re-checked, including when every outcome is a plain fix. The skills (`/code-change` step 7, the `/commit-change` gate rule 3) and POLICY.md were updated to match, and the DECISIONS.md entry that had described the narrower rule was removed. A review with no findings at all needs no re-review.
 
-Additions the review led to, beyond the plan's wording, none contradicting it (the user has read and accepted the four listed in the hand-off: the three-round settlement and extra round, correction lines, "Pass (fixed after Fail)" with its re-review trigger, and the stricter continue-mode review rule):
+Additions the review led to, beyond the plan's wording, none contradicting it. All of them have been read and accepted by the user: the four listed in the hand-off (the three-round settlement and extra round, correction lines, "Pass (fixed after Fail)" with its re-review trigger, and the stricter continue-mode review rule), and the other two, the "a round is clean only if it raised no new finding at all" rule and the CLAUDE.md continue-mode line:
 - Settled-by-the-user wording after the three-round stop, and one extra round to check a fix made after a gate failure.
 - Correction lines for fixing a record without rewriting it.
 - A round is clean only if it raised no new finding at all.
