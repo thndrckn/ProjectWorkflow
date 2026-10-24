@@ -3,7 +3,7 @@
 # Always allowed, even on master:
 #   - plan files directly inside this project's docs/plans/ (written by /plan-change)
 # Not covered: file changes made through the Bash tool (sed -i, echo >, ...).
-# See KNOWN_ISSUES.md.
+# See docs/BACKLOG.md.
 
 proj="${CLAUDE_PROJECT_DIR:-.}"
 input=$(cat)
