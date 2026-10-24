@@ -55,7 +55,7 @@ for c in 'sed -i s/a/b/ f.txt' 'sed -i.bak s/a/b/ src/f.ts' 'echo hi > f.txt' 'e
   'Set-Content f.txt hi' 'Set-Content -Path f.txt -Value hi' 'Out-File f.txt' 'Add-Content f.txt hi' \
   'Remove-Item f.txt' 'Copy-Item a b' 'Move-Item a b' 'New-Item f.txt' 'echo hi 2> err.txt' \
   'bash -c "echo hi > f.txt"' 'ls && echo hi > f.txt' 'echo hi > $HOME2/x' \
-  "echo hi > \"$master/src/x.txt\""; do
+  "echo hi > \"$master/src/x.txt\"" 'echo hi>f.txt' 'echo hi>>f.txt' 'cat a>b' 'echo hi 2>f.txt'   'bash -lc "git commit -m x"' 'bash -ec "echo hi > f.txt"' 'pwsh -NoProfile -Command "Set-Content f.txt hi"'   'echo "$(git commit -m x)"' 'echo "`git commit -m x`"' 'echo $(git commit -m x)'   'env -i git commit -m x' 'timeout 5 git commit -m x' 'xargs git commit -m x' 'g""it commit -m x'   'sudo -u root git commit -m x' 'nohup git commit -m x'   'Out-File -FilePath:f.txt' 'Set-Content -Path:f.txt -Value hi' 'Tee-Object f.txt' 'Export-Csv f.csv'   'curl -o f.txt http://x' 'wget -O f.txt http://x' 'Invoke-WebRequest http://x -OutFile f.txt'   "echo hi > $master/../master-repo/src/x.txt" 'echo hi >| f.txt'; do
   blocked "$c"
 done
 
@@ -75,7 +75,7 @@ echo "== R4: writes outside the project, or to plan files, are allowed on master
 for c in 'echo hi > /dev/null' 'echo hi 2>/dev/null' "echo hi > $other/x.txt" "cp a $other/b" \
   "rm $other/x" "tee $other/x" 'echo hi > $null' 'Out-File $null' "Set-Content -Path $other/x -Value hi" \
   "echo hi > $master/docs/plans/DTP-001-x.md" 'echo hi > docs/plans/DTP-001-x.md' \
-  'cmd 2>&1' 'git status > /dev/null 2>&1'; do
+  'cmd 2>&1' 'git status > /dev/null 2>&1' 'ls>/dev/null' 'ls 2>&1 | head' "echo hi>$other/x.txt"   "echo hi >| $other/x.txt" 'echo "$(git status)"' 'timeout 5 git status' 'env -i git log'   "Out-File -FilePath:$other/x.txt" 'curl http://x' "curl -o $other/x http://x" 'ls >&2'; do
   allowed "$c"
 done
 blocked "echo hi > $master/docs/plans/../src/x.txt"
@@ -91,6 +91,9 @@ for c in 'git commit -m x' 'echo hi > f.txt'; do
   both "unknown branch blocks: $c" 2 "$norepo" "$c"
 done
 both "unknown branch allows: git status" 0 "$norepo" 'git status'
+detached="$tmp/detached-repo"; mk_repo "$detached"; git -C "$detached" checkout -q --detach
+both "detached HEAD blocks: git commit -m x" 2 "$detached" 'git commit -m x'
+both "detached HEAD allows: git status" 0 "$detached" 'git status'
 
 echo "== R7: edit tools behave as before"
 for t in Edit Write MultiEdit; do

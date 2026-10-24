@@ -26,11 +26,13 @@ process.stdin.on("data", d => s += d).on("end", () => {
 
 if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
   branch=$(git -C "$proj" rev-parse --abbrev-ref HEAD 2>/dev/null)
-  # Only master/main (or an unreadable branch, which fails closed) is guarded.
-  if [ -n "$branch" ] && [ "$branch" != "master" ] && [ "$branch" != "main" ]; then
+  # Only master/main is let through unguarded on a named branch. An unreadable branch
+  # or a detached HEAD (rev-parse prints "HEAD") fails closed, same as being on master.
+  if [ -n "$branch" ] && [ "$branch" != "HEAD" ] && [ "$branch" != "master" ] && [ "$branch" != "main" ]; then
     exit 0
   fi
-  p=$(norm "$(cd "$proj" 2>/dev/null && pwd)")
+  # The checker normalises the path itself, so hand it the project directory as is.
+  p=$(cd "$proj" 2>/dev/null && pwd)
   # Git Bash rewrites path-like arguments for native programs, which would change $p
   # (and /tmp paths); turn that off for the project path and give node a Windows-form
   # script path (cygpath -m) so it can still find the checker.
