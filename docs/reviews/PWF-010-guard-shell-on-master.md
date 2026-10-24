@@ -16,6 +16,7 @@
 - **[Low]** Allow-listed git subcommands can still do destructive things through flags (`switch -f`, `branch -D/-m`, `tag -d`) — shell-command-check.js
   **Caused by this change:** yes
   **Disposition:** explained: the user set the allow-list at whole-subcommand level in the interview, and the plan's "Not included" says `branch -D` is deliberately not blocked. Recorded in docs/DECISIONS.md.
+  **Correction (round 2):** the user said blocking destructive flags was not their decision. Disposition is now **fixed**: on master the checker blocks `git tag -d/--delete`, `git switch -f/--force/--discard-changes` and `git branch -D` (and `--delete`/`-d` with `--force`/`-f`). The DECISIONS.md entry was removed. Settled by the user: the `branch -D` block overrides the plan's "Not included" line (see Deviations). Round 1's acceptance of the old explanation is superseded by this change.
 - **[Nit]** Path normalisation written twice (bash `norm()` and node `normPath()`) — block-main-edits.sh, shell-command-check.js
   **Caused by this change:** yes
   **Disposition:** fixed (bash now passes the project directory as is for the shell path; the original `norm()` remains only for the pre-existing edit-tool path)
@@ -25,6 +26,7 @@
 - **[Informational]** The shell check is advisory pattern matching — shell-command-check.js
   **Caused by this change:** yes
   **Disposition:** explained: stated in both hook headers and CLAUDE.md; recorded in docs/DECISIONS.md.
+  **Correction (round 2):** the docs/DECISIONS.md entry was removed at the user's direction. The explanation now rests on the documentation in the hook headers and CLAUDE.md alone; docs/DECISIONS.md is identical to master's, and the re-reviewers in rounds 2–4 confirmed it.
 
 ### Spec reviewer
 - **[Informational]** The checker blocks slightly more than the plan listed (touch, mkdir, dd, `git ... --output`, relative or unresolvable paths, `bash -c` contents) — shell-command-check.js
@@ -72,6 +74,20 @@
   **Caused by this change:** yes
   **Disposition:** explained: it fails closed, is documented, and none of it affects the check-in or build commands.
 
+### Raised by re-review rounds
+- **[Low]** (round 2) Abbreviated long options slipped past the new destructive-flag block (`git tag --del v1`, `git switch --discard x`, `git branch --del --force x`) — shell-command-check.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (any prefix longer than two characters of `--delete`, `--force`, `--discard-changes` is matched); accepted in round 3
+- **[Low]** (round 2) A letter inside a glued flag value was read as a flag (`git tag -ukeyid v1` blocked as `tag -d`) — shell-command-check.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (only letters before a value-taking letter in a cluster count); accepted in round 3. Consequence: `git switch -cf x`, which git reads as creating a branch named `f`, is allowed.
+- **[Informational]** (round 2) `git branch -f main HEAD~5` and `git branch -M a b` are allowed — shell-command-check.js
+  **Caused by this change:** yes
+  **Disposition:** explained: outside the three cases the user asked to block (`tag -d`, `switch -f`, `branch -D`); accepted in round 3
+- **[Nit]** (round 3) `git tag -m -d v1` and `git tag -m "-d" v1` were wrongly blocked, because the value after a value-taking flag was read as a flag — shell-command-check.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (the separate-token value after `-m`/`-u`/`-F`, `--message`/`--local-user`/`--file`, switch `-c`/`-C` and branch `-u` is skipped, and flags after `--` are treated as names); accepted in round 4. Settled by the user: the user chose to fix it and authorised round 4. Accepted side effect: `git branch --delete -- -f` and similar forms after `--` are allowed.
+
 ## Re-review
 
 ### Round 1
@@ -80,6 +96,15 @@ Triggered by the fixes, explanations and the new DECISIONS.md entry above. A fre
 - It accepted every fix and confirmed none broke anything. It also confirmed the check-in and build commands (`git pull --ff-only`, `git switch`, `git merge --no-ff`, `git push`, `git tag`, `git branch -d`, `git diff`, `git log`, `git status`, `git rev-parse`, plan-file writes) are still allowed.
 - No new finding. It noted that `git push origin feat:master` is allowed; that is within the accepted best-effort scope and the plan doesn't ask for it to be blocked.
 - Round clean: yes.
+
+### Round 2
+Triggered by the user's direction after round 1: remove the DECISIONS.md entry and block `tag -d`, `switch -f` and `branch -D` on master. A fresh re-reviewer ran about 60 inputs through the checker and confirmed the fix, that check-in and build commands stayed allowed, and that docs/DECISIONS.md matched master. It raised two new Low findings and two Informational notes (listed above). Round clean: no. The findings were fixed or explained and the checks re-run.
+
+### Round 3
+A fresh re-reviewer checked the fixes for the two Low findings by running sample inputs. It accepted both fixes and the explanations for `switch -cf x` and for the two Informational notes, and raised one new Nit (listed above). Round clean: no. This was the last permitted round, so the author stopped and asked the user. Settled by the user: fix the Nit and authorise round 4.
+
+### Round 4 (extra)
+Authorised by the user. A fresh re-reviewer ran about 55 inputs, including forms where a value-taking letter could hide a real destructive flag (`git tag -m x -d v1`, `git branch -u x -D y`, `git switch -c x -f`, `git tag --message x --delete v1`). It accepted the fix, found no bypass, and confirmed check-in and build commands still pass on master and that docs/DECISIONS.md matches master. No new finding. Round clean: yes.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -98,6 +123,9 @@ T2–T4 in the plan need the hook running in a real session and are Manual.
 - The checker went into its own file, `.claude/hooks/shell-command-check.js`, called from the hook. The plan described the logic inside the hook without naming this file.
 - Beyond the plan: a detached HEAD now fails closed for shell commands, and `git ... --output` is blocked because it writes a file. Both are within the plan's intent.
 - The plan's detached-HEAD/non-repo test for R6 was built as a non-repo directory plus a detached HEAD repo.
+- **Approved by the user:** the plan's "Not included" says `git branch -D` is not blocked. After the first review the user directed that master also block `git tag -d/--delete`, `git switch -f/--force/--discard-changes` and `git branch -D` (and `--delete`/`-d` with `--force`/`-f`), overriding that line. The plan is unchanged; this is the deviation. Test cases were added for each.
 
 ## Summary
 The hook now also checks Bash and PowerShell commands on master: an allow-list of git subcommands, and blocked file writes into the project, with the limits documented. The first review found three Medium bypasses (no-space redirects, `bash -lc`, substitutions in quotes) and several Low ones; all were fixed and a fresh re-reviewer accepted every outcome in a single clean round. All five project checks pass.
+
+**Update (rounds 2–4):** at the user's direction the checker also blocks `tag -d`, `switch -f` and `branch -D` on master, and the DECISIONS.md entry was removed. Rounds 2 and 3 each raised small findings in the new code, which were fixed; round 3 was the last permitted round, so the user was asked and authorised round 4, which was clean. The hook test script now passes 376 cases and all five project checks pass.
