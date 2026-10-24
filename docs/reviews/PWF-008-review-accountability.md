@@ -3,7 +3,7 @@
 - **Change:** PWF-008
 - **Plan:** docs/plans/PWF-008-review-accountability.md (approved in commit 2b57c38)
 - **Branch:** chore/PWF-008-review-accountability
-- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then one fresh re-reviewer. This record is in the old format, as the plan says: the old `/code-change` rules ran this review, so there are no caused-by labels and no format marker, and the new gate exempts it.
+- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then four fresh re-reviewers (Rounds 1 to 4, the fourth authorised by the user). This record is in the old format, as the plan says: the old `/code-change` rules ran this review, so there are no caused-by labels and no format marker, and the new gate exempts it.
 - **Scope:** diff of chore/PWF-008-review-accountability against master — 6 files changed, about 390 lines (two skill files, CLAUDE.md, docs/DECISIONS.md, the plan, the POLICY.md before-copy), plus `D:\projects\shared-claude-conventions\POLICY.md`, which is outside the repository. Its saved original is `docs/reviews/PWF-008-POLICY.md-before.md`.
 
 ## Findings
@@ -59,8 +59,42 @@ Re-review findings:
 - **[Nit]** The policy said "dated correction line" but the skill says round-numbered — POLICY.md
   **Disposition:** fixed (the policy now says round-numbered)
 
+Raised by Round 2 (labelled by the reviewer; all caused by this change):
+- **[Low]** (caused by this change: yes) A rejection settled through stop case 3 could fail the gate, because the "Settled by the user" phrase was only required for stop case 4 — code-change/SKILL.md, commit-change/SKILL.md
+  **Disposition:** fixed (every stop-case answer is recorded as "Settled by the user: <answer>")
+- **[Low]** (caused by this change: yes) Round-limit combinations had no rule (three rounds ended by user settlement then a gate failure; a second gate failure after the single extra round) — code-change/SKILL.md, commit-change/SKILL.md, POLICY.md
+  **Disposition:** fixed (any round beyond the third needs the user's authorisation, recorded as "Settled by the user: <answer>" under that round)
+- **[Low]** (caused by this change: partly) The record template had no heading for an extra round, and re-reviewers are given the author's outcomes and reasoning, which the reviewer-input rule forbade — code-change/SKILL.md, POLICY.md
+  **Disposition:** fixed (a "Round 4 (extra)" heading, and an explicit exception for re-reviewers in step 6 and in POLICY.md)
+
+Raised by Round 3 (all caused by this change):
+- **[Low]** (caused by this change: yes) "Only four stop cases" became inaccurate once a round beyond the third needs the user to authorise it; stop case 4 said "the third round" — code-change/SKILL.md, POLICY.md
+  **Disposition:** fixed (stop case 4 now covers the last permitted round, the third or an authorised extra, and a further round beyond the third)
+- **[Nit]** (caused by this change: yes) The template's "Round 4 (extra) and so on" was ambiguous for a fifth round — code-change/SKILL.md
+  **Disposition:** fixed (the template lists "Round 4 (extra)", "Round 5 (extra)" and so on)
+- **[Informational]** (caused by this change: yes) POLICY.md did not name the phrase the gate looks for — POLICY.md, commit-change/SKILL.md
+  **Disposition:** fixed (the policy names "Settled by the user: <answer>")
+
+Round 4 (extra) raised no findings.
+
 ## Re-review
-One re-review ran, because three Medium findings were raised. It checked the fixes and explanations above. It accepted all three explanations (one of them, the plain-fix one, was later overturned by the user; see its finding) and found every fix resolved its finding, apart from the points above, which it raised as new Low and Nit findings. It found no Medium or High issues. Those new findings were all fixed. There is no second re-review under the rules this change was reviewed by, so the fixes to the re-review's findings and the policy wording fixes made after it were not re-checked by a reviewer. The same goes for the later edits that make any fix trigger a re-review (the skills and policy wording).
+Four rounds ran. The first was under the old rules (one re-review); after the user's decision that any fix triggers a re-review, the rest ran under the new rules, with each new finding labelled caused-by-this-change by the reviewer and all of them caused (one "partly"). The record stays in the old format, so the labels are written inline, not as label lines, and the gate exempts it.
+
+### Round 1
+Triggered by the three Medium findings. It checked the fixes and explanations above. It accepted all three explanations (the plain-fix one was later overturned by the user; see its finding) and found every fix resolved its finding, apart from the new Low and Nit findings listed under "Re-review findings". No Medium or High issues. All were fixed. Not clean (new findings).
+
+### Round 2
+Triggered by the user's decision that any fix triggers a re-review, and by the fixes made after Round 1. It checked fixes A to F (the settled-by-the-user override, the closed-round rule, the "fixed after Fail" trace result, the stricter continue-mode review rule, the policy round wording, and the widened trigger with the DECISIONS.md entry removed), all of which held. It raised three Low findings, listed under "Raised by Round 2". All fixed. Not clean (new findings).
+
+### Round 3
+Checked the three Round 2 fixes and accepted all three. It raised one Low, one Nit and one Informational finding, listed under "Raised by Round 3", all caused by this change. This was the third round, so it was not clean and stop case 4 applied.
+Question asked of the user: how to settle the three open items (fix all three and authorise one more round; fix all three with no further review; fix only the Low and explain the rest).
+Settled by the user: fix all three and authorise one more round (Round 4 (extra)). All three were fixed.
+
+### Round 4 (extra)
+Authorised by the user (see Round 3). It accepted all three fixes and raised no findings and no new contradiction, deadlock or loophole. One observation, not a finding: step 7 still says "Keep going until a round is clean" next to the three-round limit; stop case 4 caps it, so nothing was changed. Clean.
+
+Nothing is left unchecked: every fix made in this change was checked by a later round, and Round 4 found nothing further.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -84,8 +118,9 @@ Additions the review led to, beyond the plan's wording, none contradicting it. A
 - Correction lines for fixing a record without rewriting it.
 - A round is clean only if it raised no new finding at all.
 - A fixed requirement Fail triggers a re-review, and is recorded as "Pass (fixed after Fail)".
+- Added in later rounds, not yet listed above: any round beyond the third needs the user's authorisation (recorded as "Settled by the user: <answer>"); every stop-case answer is recorded with that phrase; stop case 4 covers the last permitted round and a needed extra round; re-reviewers are exempt from the "no author reasoning" input rule. These came from re-review findings and are recorded in the Re-review section; the user has not yet been asked to accept them as deviations.
 - Continue-mode edge cases: no record yet, an old-format record, and a stricter rule for when new work gets the full review.
 - The plan allowed a CLAUDE.md line "only if needed"; one line about continue mode was added to the Workflow section.
 
 ## Summary
-The review rules now work as the plan describes, in the `/code-change` and `/commit-change` skills and the shared policy. The independent review found real gaps in how the loop ends, how records are corrected, and how the gate detects its trigger; all were fixed. All five checks passed, and the plan is untouched since approval. The first real test of the gate is the next change's check-in (plan T5).
+The review rules now work as the plan describes, in the `/code-change` and `/commit-change` skills and the shared policy. The independent review found real gaps in how the loop ends, how records are corrected, and how the gate detects its trigger; all were fixed. Four re-review rounds ran, the last one authorised by the user, and the fourth found nothing, so every fix was checked by a reviewer. All five checks passed, and the plan is untouched since approval. The first real test of the gate is the next change's check-in (plan T5).
