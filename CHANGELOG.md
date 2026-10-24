@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-010 (chore) The master-edit guard now also checks shell commands (Bash and PowerShell) on master: only an allow-list of git subcommands passes, and writes into the project are blocked; best-effort, with a test script.
 - PWF-009 (chore) Added docs/BACKLOG.md for review findings that were neither fixed nor explained, and retired KNOWN_ISSUES.md; every /plan-change now asks about each backlog item first (plan it now, keep it queued, or accept it).
 - PWF-008 (chore) Review accountability: reviewers label each finding "caused by this change" yes/no, a caused finding must be fixed or explained (never logged), fresh re-reviewers check every non-plain-fix outcome in up to three rounds, /code-change can continue an existing branch, and /commit-change checks the review record before merging. Shared POLICY.md updated to match.
 - PWF-007 (chore) Skill fixes found while setting up Spoolkeeper: the hand-off lists every review finding, backup steps come from a new CLAUDE.md line, reviewers know the records come later, and by-design review decisions go into a new docs/DECISIONS.md that CLAUDE.md loads.
