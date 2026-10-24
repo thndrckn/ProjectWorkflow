@@ -357,8 +357,21 @@ function worktreeRefRule(sub, rest) {
       if (DEFAULT_BRANCHES.includes(r.replace(/^\+/, '').split(':').pop())) return 'git fetch into the default branch from a worktree';
     }
   }
-  if (sub === 'config' && nonOpt.length >= 2 && /^core\.(worktree|bare)$/i.test(nonOpt[0])) {
-    return 'git config core.worktree / core.bare could redirect git for every worktree';
+  if (sub === 'config') {
+    // Any non-option word may be the key (a leading `set`, or the value of --type, can sit
+    // in front of it), and -f/--file names the config file being written.
+    let file = null;
+    const words = [];
+    for (let k = 0; k < rest.length; k++) {
+      const a = rest[k];
+      if (a === '-f' || (isLong(a, '--file') && !a.includes('='))) file = rest[++k] || '';
+      else if (isLong(a, '--file')) file = a.slice(a.indexOf('=') + 1);
+      else if (!a.startsWith('-')) words.push(a);
+    }
+    if (words.length >= 2 && words.some((w) => /^core\.(worktree|bare)$/i.test(w))) {
+      return 'git config core.worktree / core.bare could redirect git for every worktree';
+    }
+    if (file !== null && words.length >= 1 && pointsIntoMain(file)) return 'git config writing the main folder\'s config file';
   }
   return null;
 }
