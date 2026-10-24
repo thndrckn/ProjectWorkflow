@@ -56,7 +56,7 @@ Tag the default branch `vX.Y.Z` (an annotated tag, message `vX.Y.Z`) and push th
 Run the build command from CLAUDE.md. Report the installer location (for a Tauri build, under `src-tauri/target/release/bundle/`) and the file names. If the build fails, say so plainly. The version and tag are already published at this point, so tell the user the fix goes through the normal workflow and the next build makes a new version.
 
 ## 9. Migrations
-List every line in this version's changelog entries that says a migration is required (for example "Migration 027 required."). If there are any, remind the user to Export All and back up the database file before running them, and that the app won't start against the database until they are run. If there are none, say so.
+List every line in this version's changelog entries that says a migration is required (for example "Migration 027 required."). If there are any, remind the user to take the steps in CLAUDE.md's "Backup before a migration" line before running them (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until they are run. If there are none, say so.
 
 ## Never
 - Create a change number, plan or review record for a build.

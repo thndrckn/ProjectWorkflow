@@ -51,7 +51,7 @@ Only needed if the default branch has commits the working branch doesn't (`git l
 Tell the user in plain English:
 - The change number and title that were checked in.
 - That the default branch is on GitHub.
-- Anything they still need to do by hand, such as running a new migration: Export All and back up the database file first.
+- Anything they still need to do by hand, such as running a new migration: the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask them how to back up).
 
 ## Never
 - Merge without completing steps 1–4.
