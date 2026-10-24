@@ -105,6 +105,7 @@ A fresh re-reviewer checked the fixes for the two Low findings by running sample
 
 ### Round 4 (extra)
 Authorised by the user. A fresh re-reviewer ran about 55 inputs, including forms where a value-taking letter could hide a real destructive flag (`git tag -m x -d v1`, `git branch -u x -D y`, `git switch -c x -f`, `git tag --message x --delete v1`). It accepted the fix, found no bypass, and confirmed check-in and build commands still pass on master and that docs/DECISIONS.md matches master. No new finding. Round clean: yes.
+**Correction (round 4):** this round was authorised by the user. Settled by the user: after round 3 the author stopped and asked how to settle the open Nit, and the user answered "Fix it and authorise round 4". The wording was already recorded under Round 3 and on the Nit's disposition; it is repeated here, under the round it authorises, as the check-in gate requires.
 
 ## Requirements trace
 | Requirement | Test | Result |
