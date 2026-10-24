@@ -25,7 +25,7 @@ First review, Standards reviewer:
 - **[Low]** Continue-mode detection looser than the plan, with no way to get the change number — code-change/SKILL.md
   **Disposition:** fixed (the number comes from the branch name, the search is anchored on `^docs(<NUMBER>): approved plan`, and it stops and asks if the branch name has no number)
 - **[Informational]** A plain fix is never independently re-checked when every outcome in a review is a plain fix — code-change/SKILL.md, POLICY.md
-  **Disposition:** explained (by design: the user's rule 3 for this change). Recorded in docs/DECISIONS.md. The re-reviewer accepted this.
+  **Disposition:** first explained as by design, with an entry in docs/DECISIONS.md, and the re-reviewer accepted that. The user then said it was not their rule, decided that any fix triggers the re-review so every fix is independently re-checked, and approved that as a deviation from the plan. Fixed: the skills and policy now trigger the re-review on any outcome, including a plain fix, and the DECISIONS.md entry was removed.
 
 First review, Correctness reviewer:
 - **[Medium]** Deadlock after the three-round cap: nothing said what happens after the user answers — code-change/SKILL.md, commit-change/SKILL.md
@@ -60,7 +60,7 @@ Re-review findings:
   **Disposition:** fixed (the policy now says round-numbered)
 
 ## Re-review
-One re-review ran, because three Medium findings were raised. It checked the fixes and explanations above. It accepted all three explanations and found every fix resolved its finding, apart from the points above, which it raised as new Low and Nit findings. It found no Medium or High issues. Those new findings were all fixed. There is no second re-review under the rules this change was reviewed by, so the fixes to the re-review's findings and the policy wording fixes made after it were not re-checked by a reviewer.
+One re-review ran, because three Medium findings were raised. It checked the fixes and explanations above. It accepted all three explanations (one of them, the plain-fix one, was later overturned by the user; see its finding) and found every fix resolved its finding, apart from the points above, which it raised as new Low and Nit findings. It found no Medium or High issues. Those new findings were all fixed. There is no second re-review under the rules this change was reviewed by, so the fixes to the re-review's findings and the policy wording fixes made after it were not re-checked by a reviewer. The same goes for the later edits that make any fix trigger a re-review (the skills and policy wording).
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -68,7 +68,7 @@ One re-review ran, because three Medium findings were raised. It checked the fix
 | R1 | Read the code-change skill: reviewer briefs require severity and a caused label, and a missing or wrong plan requirement and a Fail count as caused | Pass (checked by Claude) |
 | R2 | Read step 7: a caused "yes" finding can only be fixed or explained, never logged | Pass (checked by Claude) |
 | R3 | Read step 7: a "no" finding may be fixed, explained or logged at any severity, and the re-reviewer confirms the label | Pass (checked by Claude) |
-| R4 | Read step 7: trigger, scope and a fresh reviewer each round, repeated until a round is clean | Pass (checked by Claude) |
+| R4 | Read step 7: trigger (any outcome, including a plain fix, per the approved deviation), scope and a fresh reviewer each round, repeated until a round is clean | Pass (checked by Claude) |
 | R5 | Read step 7: stop case 4 after the third round with the open items shown | Pass (checked by Claude) |
 | R6 | Read step 7: a rejection is fixed, logged if not caused, or goes to the user | Pass (checked by Claude) |
 | R7 | Read step 7: a label dispute counts as an explanation the re-reviewer must accept | Pass (checked by Claude) |
@@ -77,13 +77,14 @@ One re-review ran, because three Medium findings were raised. It checked the fix
 | R10 | Diffed POLICY.md against the before-copy; confirmed the before-copy matches the original (byte-compared before editing) | Pass (checked by Claude) |
 
 ## Deviations from the plan
-Additions the review led to, beyond the plan's wording, none contradicting it:
+**Approved by the user, contradicting the plan's R4:** R4 re-checks only when a finding "ended as something other than plain fixed". The user decided that any fix triggers the re-review, so every fix is independently re-checked, including when every outcome is a plain fix. The skills (`/code-change` step 7, the `/commit-change` gate rule 3) and POLICY.md were updated to match, and the DECISIONS.md entry that had described the narrower rule was removed. A review with no findings at all needs no re-review.
+
+Additions the review led to, beyond the plan's wording, none contradicting it (the user has read and accepted the four listed in the hand-off: the three-round settlement and extra round, correction lines, "Pass (fixed after Fail)" with its re-review trigger, and the stricter continue-mode review rule):
 - Settled-by-the-user wording after the three-round stop, and one extra round to check a fix made after a gate failure.
 - Correction lines for fixing a record without rewriting it.
 - A round is clean only if it raised no new finding at all.
 - A fixed requirement Fail triggers a re-review, and is recorded as "Pass (fixed after Fail)".
 - Continue-mode edge cases: no record yet, an old-format record, and a stricter rule for when new work gets the full review.
-- A by-design entry in docs/DECISIONS.md.
 - The plan allowed a CLAUDE.md line "only if needed"; one line about continue mode was added to the Workflow section.
 
 ## Summary

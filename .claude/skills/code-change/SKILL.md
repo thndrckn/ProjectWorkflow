@@ -74,7 +74,7 @@ The review is done by reviewers independent of you. You wrote the code, so you d
 ## 7. Settle the findings, check again, re-review
 Settle every finding yourself. Do not stop to ask the user which to fix. Stop only in these four cases, each described below: (1) a fix would go against the approved plan, (2) a fix would touch the user's data, (3) the re-reviewer rejects an explanation and you still disagree, (4) the third re-review round is still not clean.
 
-You never have the last word on your own findings: every outcome other than plain "fixed" is checked by a fresh reviewer below.
+You never have the last word on your own findings: every outcome, including every fix, is checked by a fresh reviewer below.
 
 - Every finding ends in one of three places: **fixed**, **explained** ("not a real problem": wrong, by design, or a pure observation, with the reason), or **logged** in KNOWN_ISSUES.md. Nothing is left unaccounted for. What is allowed depends on the reviewer's "Caused by this change" label:
   - **Caused: yes** — can only be fixed, or explained with a reason the re-reviewer accepts. It can never be logged, and never accepted as is.
@@ -89,7 +89,7 @@ You never have the last word on your own findings: every outcome other than plai
   - Manual check that needs the user at the app: record "Manual".
   - A Fail is not a reviewer finding and carries no severity. It is always "caused: yes": it can only be fixed, never explained away or logged, with the same stop cases. A fixed Fail triggers a re-review like any non-plain outcome.
 - Run every check from step 5 again. All must pass. Re-run any requirement test that failed.
-- **Re-review (a loop, at most three rounds):** after the first review is settled, if any outcome is anything other than plain "fixed" (an explanation, a logged item, a disputed label) or a requirement Fail was fixed, at any severity, launch one fresh reviewer (same rules as step 6, a new one each round). Give it the plan, the standards, the diff of the fixes, and for each finding its label, your outcome and your reasoning. It must:
+- **Re-review (a loop, at most three rounds):** after the first review is settled, if there is any outcome at all (any fix, explanation, logged item or disputed label, or a fixed requirement Fail), at any severity, launch one fresh reviewer (same rules as step 6, a new one each round). Give it the plan, the standards, the diff of the fixes, and for each finding its label, your outcome and your reasoning. It must:
   - check every explanation and say whether it accepts it,
   - check every logged item and confirm the "caused: no" label is true,
   - check every fix (including fixed Fails) and say whether it really resolves the finding without breaking anything,
