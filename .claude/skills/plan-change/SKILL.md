@@ -81,7 +81,7 @@ Use exactly this format. The top sections are for the user: plain English, no co
 <Only when the user accepted items: each title with the user's reason. /code-change adds them to docs/DECISIONS.md and removes them from the backlog. Leave this section out otherwise.>
 
 ## Original request (set aside)
-<Only when "Plan it now" set aside a non-empty original request: that request, word for word, exactly as the user typed it, in a fenced block whose fence is longer than any run of backticks inside the request (or use `~~~`), so the text is never altered, trimmed or rewrapped. Leave this section out otherwise.>
+<Only when "Plan it now" set aside a non-empty original request: that request, word for word, exactly as the user typed it, in a fenced block whose fence is longer than any run of backticks inside the request (or use a `~~~` fence, longer than any run of tildes inside it), so the text is never altered, trimmed or rewrapped. Leave this section out otherwise.>
 
 ## What could go wrong / what gets lost
 <Data loss, migrations to run by hand, risky changes. Always present. Write "Nothing" if so.>
