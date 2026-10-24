@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-005 (chore) The planning interview now follows Matt Pocock's grilling method, written into plan-change with credit: it asks one question at a time (recommended answer first), most-unblocking first, and stops only when nothing is left to ask.
 - PWF-004 (chore) Code review is now part of the coding step: independent reviewers rate the findings, Claude settles them itself and asks only about plan conflicts, data risk or a rejected explanation, and the hand-off starts with a plain-English review summary.
 - PWF-003 (chore) Plans now have signed-off Given/When/Then requirements, a planned test for each, and a numbered manual test procedure; review records get a requirements trace table.
 - PWF-002 (chore) Finished the workflow: project-neutral skills, stricter review rules, a catch-up merge at check-in, and a new /build-changes command.

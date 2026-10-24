@@ -28,13 +28,17 @@ Never skip the interview or the play-back. If the request already answers everyt
 - Tell the user the number in one line, for example: "This change is ABC-085."
 
 ## 3. Interview the user
-Use the grilling skill, with these rules:
-- Ask exactly ONE question per message. Never batch questions.
-- Ask every question using the question box (the AskUserQuestion tool): one question per box, never several questions in one box. Put the recommended answer first in the options and label it "(Recommended)".
-- Wait for the user's reply before asking the next question.
-- Only ask about real decisions: what it should do, edge cases, trade-offs. Never ask about facts you can look up.
+Grill the user relentlessly until you reach a shared understanding. Method adapted from Matt Pocock's grilling skill.
+
+Map the change as a design tree: every decision branches into the decisions that hang off it. The **frontier** is every decision whose prerequisites are already settled, the questions you can ask now without guessing at answers you haven't heard yet. A question whose answer depends on another open question is not on the frontier yet.
+
+Work the frontier with these rules:
+- Ask exactly ONE question per message, never a whole round at once. Pick the question that unblocks the most other decisions. Risky ones go as soon as they are on the frontier.
+- Ask every question using the question box (the AskUserQuestion tool): one question per box, never several questions in one box. Put the recommended answer first in the options and label it "(Recommended)". Word each question so that choosing the recommended answer is a plain "yes".
+- Wait for the user's reply. Each answer settles decisions and may unblock others, so recompute the frontier before asking the next question.
+- Only ask about real decisions: what it should do, edge cases, trade-offs. Finding facts is your job, never the user's: look them up yourself, and use a sub-agent only for a broad search. Never ask about facts you can look up.
 - Ask about anything risky as its own question: schema changes, migrations, data that could be lost or changed, anything touching import/export or deletes.
-- Keep going until nothing important is unresolved.
+- Stop only when the frontier is empty: every branch visited, nothing left silently assumed. Then go to the play-back (step 4). The user's yes there is the confirmation of shared understanding.
 
 ## 4. Play it back
 Draft the requirements from the interview. Every plan has at least one requirement, whatever its type. Each is a numbered Given / When / Then case (R1, R2, …) in plain English that can be checked on its own.
