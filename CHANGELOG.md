@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-013 (chore) The inert plan-renaming script, its after-plan-mode hook entry and the plan-folder setting are removed from the project settings; plan mode stays blocked. The matching backlog entry is removed.
 - PWF-012 (chore) The shared policy's change-number and commit-message examples now use the neutral `ABC-085` instead of this project's real `DTP-085`; the matching backlog entry is removed.
 - PWF-011 (chore) Three plan rules added to /plan-change and the shared policy (no made-up changes in tests, workflow changes are chore, no project-specific wording in shared skills and hooks), and the skills' stack wording moved into new CLAUDE.md lines (lockfile commands, installer location, data folder).
 - PWF-010 (chore) The master-edit guard now also checks shell commands (Bash and PowerShell) on master: only an allow-list of git subcommands passes, and writes into the project are blocked; best-effort, with a test script.
