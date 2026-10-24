@@ -17,3 +17,9 @@ Entry format:
 - **Severity:** Nit
 - **Files:** `.claude/hooks/rename-plan.sh`, `.claude/settings.json`
 - **What's wrong:** The rename-plan hook runs after `ExitPlanMode`, and `plansDirectory` only matters to plan mode. Plan mode is blocked, so neither does anything today. They were kept because the approved plan said to keep them; the review suggested deleting them, which was declined because it contradicts the plan. Remove them in a later change if plan mode is never coming back.
+
+## The shared policy's change-number example uses one project's real prefix
+- **Found in:** PWF-011
+- **Severity:** Nit
+- **Files:** `D:\projects\shared-claude-conventions\POLICY.md`
+- **What's wrong:** The "Change numbers" and "Commit message convention" sections of the shared policy use `DTP-085` as their example, which is this project's real prefix, while the skills now use the neutral `ABC-085`. The three new rules cover skills and hooks, not the policy itself, and the plan left placeholder examples out, so it was not changed.

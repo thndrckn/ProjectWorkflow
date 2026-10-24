@@ -26,7 +26,7 @@ If any of these fails, STOP and tell the user in plain English what is wrong.
 Read `CHANGELOG.md` and list every entry under `## [Unreleased]`, exactly as written, in plain English. If there are none, first check whether the newest version heading in `CHANGELOG.md` has no matching `v*` tag. If it has none, an earlier build was interrupted after the merge: tell the user, and with their OK continue from step 7 for that version. Otherwise STOP and say there is nothing to build.
 
 ## 3. Propose the version
-- Find the current version from the newest version heading in `CHANGELOG.md` and the latest `v*` git tag. Find the latest tag with `git tag --list "v*" --sort=-v:refname` (sorted by version, never alphabetically, so `v0.9.0` sorts below `v0.21.0`) and take the first one. If no `v*` tag exists, STOP and ask the user which commit the review in step 5 should start from. If the tag and the newest heading disagree, STOP and tell the user.
+- Find the current version from the newest version heading in `CHANGELOG.md` and the latest `v*` git tag. Find the latest tag with `git tag --list "v*" --sort=-v:refname` (sorted by version, never alphabetically, so `v1.9.0` sorts below `v1.21.0`) and take the first one. If no `v*` tag exists, STOP and ask the user which commit the review in step 5 should start from. If the tag and the newest heading disagree, STOP and tell the user.
 - Propose the next version: a minor bump if any waiting entry is a `(feat)`, otherwise a patch bump. Show which entry decided it.
 - Ask the user to approve it, using the question box with the proposed version as the first option "(Recommended)". The user may choose a different version. STOP until they answer.
 
@@ -43,7 +43,7 @@ Run every check under "Checks (all must pass)" in CLAUDE.md, plus every check un
 - Create the branch `build/vX.Y.Z` from the default branch.
 - In `CHANGELOG.md`, move the Unreleased entries under a new heading `## [X.Y.Z] - <today's date>`, leaving an empty `## [Unreleased]` above it.
 - Set the version in the version files that hold it directly (everything under "Version files" in CLAUDE.md except the lockfiles).
-- Regenerate the lockfiles with the tools, never by hand: `npm install --package-lock-only`, and `cargo check --manifest-path src-tauri/Cargo.toml`. Then compare each lockfile against the default branch (`git diff <default> -- <lockfile>`). The only changes allowed are this app's own version lines. If anything else changed (for example a dependency version), STOP, leave the branch as it is, show the user the diff, and do not commit.
+- Regenerate the lockfiles with the tools, never by hand, with the commands in CLAUDE.md's "Lockfile commands" line (if CLAUDE.md has no such line, say so and ask the user how). Then compare each lockfile against the default branch (`git diff <default> -- <lockfile>`). The only changes allowed are the project's own version lines. If anything else changed (for example a dependency version), STOP, leave the branch as it is, show the user the diff, and do not commit.
 - Commit everything on the branch with the message `chore(release): vX.Y.Z`.
 - Switch to the default branch and merge with `git merge --no-ff build/vX.Y.Z`, using the message `chore(release): vX.Y.Z`. If the merge conflicts, run `git merge --abort`, STOP, and tell the user.
 - Push the default branch. If the push is rejected, STOP and tell the user in plain English. Do not force-push.
@@ -53,14 +53,14 @@ Run every check under "Checks (all must pass)" in CLAUDE.md, plus every check un
 Tag the default branch `vX.Y.Z` (an annotated tag, message `vX.Y.Z`) and push the tag. If creating or pushing the tag fails, STOP and tell the user in plain English that the release commit is already on the default branch and GitHub but has no tag yet. Running `/build-changes` again picks this up (step 2). Do not move or force-push a tag.
 
 ## 8. Build the installer
-Run the build command from CLAUDE.md. Report the installer location (for a Tauri build, under `src-tauri/target/release/bundle/`) and the file names. If the build fails, say so plainly. The version and tag are already published at this point, so tell the user the fix goes through the normal workflow and the next build makes a new version.
+Run the build command from CLAUDE.md. Report the installer location from CLAUDE.md's "Installer location" line (if CLAUDE.md has no such line, find the build output and say so) and the file names. If the build fails, say so plainly. The version and tag are already published at this point, so tell the user the fix goes through the normal workflow and the next build makes a new version.
 
 ## 9. Migrations
-List every line in this version's changelog entries that says a migration is required (for example "Migration 027 required."). If there are any, remind the user to take the steps in CLAUDE.md's "Backup before a migration" line before running them (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until they are run. If there are none, say so.
+List every line in this version's changelog entries that says a migration is required (for example "Migration NNN required."). If there are any, remind the user to take the steps in CLAUDE.md's "Backup before a migration" line before running them (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until they are run. If there are none, say so.
 
 ## Never
 - Create a change number, plan or review record for a build.
 - Edit code, or fix a problem the checks or the review found.
-- Edit anything under `data/` or run anything against it.
+- Edit anything in the data folder (CLAUDE.md's "Data folder" line) or run anything against it.
 - Force-push, or push any branch other than the default branch and the tag.
 - Make a version in any other way. A check-in never does.

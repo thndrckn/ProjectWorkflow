@@ -104,7 +104,7 @@ Expected: <what the user should see.>
 ---
 
 ## Technical detail (for Claude)
-<Files, layers (Rust vs frontend) and why, functions to reuse, migration contents,
+<Files, layers and why, functions to reuse, migration contents,
 tests to add, the CLAUDE.md feature cycle steps that apply.>
 
 **Planned tests**
@@ -112,9 +112,12 @@ tests to add, the CLAUDE.md feature cycle steps that apply.>
 ```
 
 Rules for the plan:
-- Every requirement has a planned test in "Planned tests". A test is automated wherever one can exist (Rust, frontend logic). A manual check is named and says why.
+- Every requirement has a planned test in "Planned tests". A test is automated wherever one can exist (unit or logic tests). A manual check is named and says why.
 - Requirements are plain English, with no code or file paths, like the other top sections.
-- Follow the project's architecture: business logic in Rust, the full feature cycle, lookup tables, numbered migrations.
+- Follow the architecture and conventions CLAUDE.md describes.
+- Tests never use a made-up change or a test-only decision; a check that needs a live run uses the next real change.
+- Workflow and tooling changes are type chore.
+- Shared skills and hooks never contain anything project-specific (numbers, file names, app features); project facts come from CLAUDE.md. The shared workflow's own paths (plans, reviews, changelog, backlog, decisions) are not project-specific.
 - If any section would be long, the change is probably too big. Say so and suggest splitting it into separate changes, each with its own number.
 
 ## 7. Stop

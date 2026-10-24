@@ -72,5 +72,5 @@ Tell the user in plain English:
 - Write or change the plan, the review record, or the CHANGELOG entry. The one exception is the merge-conflict section in step 4. If anything else is wrong, STOP and say so.
 - Rebase.
 - Push any branch other than the default branch, or force-push anything.
-- Run anything against files in `data/`.
+- Run anything against files in the data folder (CLAUDE.md's "Data folder" line).
 - Leave the default branch ahead of GitHub.
