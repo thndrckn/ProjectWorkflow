@@ -106,6 +106,51 @@ for t in Edit Write MultiEdit; do
   check "feature allows $t on a project file" 0 "$feature" "$t" "$feature/src/x.ts"
 done
 
+# The hook input carries cwd; these cases run from inside a worktree of the master repo.
+# checkc <name> <expected exit> <project dir> <cwd> <tool> <command-or-file_path>
+checkc() {
+  local name=$1 want=$2 repo=$3 cwd=$4 tool=$5 arg=$6 json code
+  case "$tool" in
+    Bash|PowerShell) json=$(node -e 'console.log(JSON.stringify({tool_name:process.argv[1],cwd:process.argv[3],tool_input:{command:process.argv[2]}}))' "$tool" "$arg" "$cwd") ;;
+    *) json=$(node -e 'console.log(JSON.stringify({tool_name:process.argv[1],cwd:process.argv[3],tool_input:{file_path:process.argv[2]}}))' "$tool" "$arg" "$cwd") ;;
+  esac
+  printf '%s' "$json" | CLAUDE_PROJECT_DIR="$repo" bash "$hook" >/dev/null 2>&1
+  code=$?
+  if [ "$code" = "$want" ]; then pass=$((pass+1)); echo "PASS  $name"
+  else fail=$((fail+1)); echo "FAIL  $name (wanted $want, got $code)  [$tool] $arg"; fi
+}
+bothc() { checkc "$1 [Bash]" "$2" "$3" "$4" Bash "$5"; checkc "$1 [PowerShell]" "$2" "$3" "$4" PowerShell "$5"; }
+
+wt="$master/.claude/worktrees/ABC-001"
+git -C "$master" worktree add -q "$wt" -b chore/ABC-001-w
+
+echo "== R8: a worktree on a change branch is not blocked, and master's folder stays protected from it"
+for t in Edit Write MultiEdit; do
+  checkc "worktree allows $t on its own file" 0 "$master" "$wt" "$t" "$wt/src/x.ts"
+  checkc "worktree session blocks $t on master's file" 2 "$master" "$wt" "$t" "$master/src/x.ts"
+  checkc "worktree session blocks $t climbing into master's folder" 2 "$master" "$wt" "$t" "$wt/../../../src/x.ts"
+done
+for c in 'git commit -m x' 'git add .' 'git reset --hard' 'echo hi > f.txt' 'rm f' 'sed -i s/a/b/ f' \
+  "echo hi > $wt/src/x.txt" "git -C $wt commit -m x" 'cargo test' "cp a $other/b"; do
+  bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
+done
+for c in "echo hi > $master/src/x.txt" "cp a $master/src/b" "rm -rf $master/src" 'echo hi > ../../../x.txt' \
+  "git -C $master commit -m x" "git --git-dir=$master/.git commit -m x" "git -C $master add ."; do
+  bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
+done
+bothc "worktree session still reads master" 0 "$master" "$wt" "git -C $master status"
+
+echo "== R9: worktree commands on master"
+for c in 'git worktree add .claude/worktrees/ABC-002 -b chore/ABC-002-x master' 'git worktree list' \
+  "git worktree remove $wt" 'git worktree remove .claude/worktrees/ABC-001'; do
+  allowed "$c"
+done
+for c in 'git worktree remove --force x' 'git worktree remove -f x' 'git worktree remove x -f' \
+  'git worktree add -f p master' 'git worktree add --force p master' 'git worktree add -B master p' \
+  'git worktree prune' 'git worktree move a b' 'git worktree lock x' 'git worktree unlock x' 'git worktree repair'; do
+  blocked "$c"
+done
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]

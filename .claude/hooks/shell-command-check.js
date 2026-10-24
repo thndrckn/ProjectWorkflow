@@ -11,6 +11,10 @@
 import path from 'node:path';
 
 const proj = normPath(process.argv[2] || '');
+// 'worktree' when the command runs inside a worktree of this project while the main
+// folder (proj) is on master: the worktree's own files are free to change, and only the
+// main folder is protected. Anything else is 'master': proj is the folder being guarded.
+const worktreeMode = process.argv[3] === 'worktree';
 
 // Git subcommands allowed as a whole, apart from the flags in destructiveGitFlag()
 // (tag -d, switch -f, branch -D) and --output (which writes a file).
@@ -77,6 +81,13 @@ function isPlanFile(n) {
   return !n.startsWith('/') && n.replace(/^\.\//, '').startsWith('docs/plans/');
 }
 
+// True when an absolute, normalised path is inside the guarded main folder. Worktrees live
+// under its .claude/worktrees/ and are judged by their own branch, so they don't count.
+function inMain(n) {
+  if (n !== proj && !n.startsWith(proj + '/')) return false;
+  return !n.startsWith(proj + '/.claude/worktrees/');
+}
+
 // True when writing to this path is allowed on master.
 function destOk(raw) {
   const w = stripQuotes(raw);
@@ -88,8 +99,10 @@ function destOk(raw) {
   let n = normPath(w);
   if (n.startsWith('/')) n = path.posix.normalize(n); // collapse any .. before comparing
   if (isPlanFile(n)) return true;
-  if (n.startsWith('/')) return !(n === proj || n.startsWith(proj + '/'));
-  return false; // relative: inside the project
+  if (n.startsWith('/')) return !inMain(n);
+  // Relative: inside the project on master. In a worktree it lands in the worktree itself,
+  // unless it climbs out with '..' (which could reach the main folder).
+  return worktreeMode && !n.includes('..');
 }
 
 // Finds the end of a $( ... ) or ` ... ` substitution starting at i; returns the index of its closer.
@@ -213,6 +226,23 @@ function destructiveGitFlag(sub, rest) {
   return null;
 }
 
+// In a worktree, true when a git global option (-C, --git-dir, --work-tree) points at the
+// main folder, or at something that can't be resolved, so the master rules apply to it.
+function redirectsIntoMain(opts) {
+  for (let i = 0; i < opts.length; i++) {
+    const a = opts[i];
+    let v = null;
+    if (a === '-C' || a === '--git-dir' || a === '--work-tree') v = opts[i + 1];
+    else if (a.startsWith('--git-dir=') || a.startsWith('--work-tree=')) v = a.slice(a.indexOf('=') + 1);
+    if (v === null || v === undefined) continue;
+    const w = stripQuotes(v);
+    if (/[$%`]/.test(w) || w.includes('..')) return true;
+    const n = normPath(w);
+    if (n.startsWith('/') && inMain(path.posix.normalize(n))) return true;
+  }
+  return false;
+}
+
 function gitCheck(args) {
   let i = 0;
   while (i < args.length && args[i].startsWith('-')) {
@@ -220,6 +250,7 @@ function gitCheck(args) {
     if (a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree') i += 2;
     else i += 1;
   }
+  if (worktreeMode && !redirectsIntoMain(args.slice(0, i))) return null; // git inside the worktree is free
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
   if (sub === '') return null;
@@ -245,6 +276,18 @@ function gitCheck(args) {
     }
     case 'checkout':
       return rest[0] === '-b' && rest.length >= 2 ? null : 'git checkout is only allowed as checkout -b';
+    case 'worktree': {
+      // add, list and a plain remove only. Force (-f, -ff, --force) would let a branch be
+      // checked out twice or a dirty worktree be thrown away; -B resets an existing branch.
+      const verb = nonOpt[0];
+      if (verb === 'list') return null;
+      const force = rest.some((a) => a === '--force' || (/^-[a-zA-Z]+$/.test(a) && a.includes('f')));
+      if (verb === 'remove') return force ? 'forced git worktree remove' : null;
+      if (verb === 'add') {
+        return force || rest.some((a) => /^-[a-zA-Z]*B/.test(a)) ? 'forced git worktree add' : null;
+      }
+      return verb ? `git worktree ${verb} is not allowed` : 'git worktree without a subcommand is not allowed';
+    }
     default:
       return `git ${sub} is not allowed`;
   }

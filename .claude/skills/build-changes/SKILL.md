@@ -18,7 +18,7 @@ Run each as its own command.
 - Confirm you are on the default branch.
 - Confirm there are no uncommitted changes.
 - Fetch from GitHub and confirm the default branch matches `origin/<default>`.
-- Run `git branch` and confirm there are no other local branches. A leftover `build/vX.Y.Z` branch means an earlier build was interrupted: say so, and STOP so the user can decide what to do with it.
+- Run `git branch` and `git worktree list`. A leftover `build/vX.Y.Z` branch means an earlier build was interrupted: say so, and STOP so the user can decide what to do with it. Any other working branch or worktree is a change still being coded: that does not stop the build, because only what is already merged is built. List each in one plain line as "not part of this version", and carry on. Leave them untouched.
 
 If any of these fails, STOP and tell the user in plain English what is wrong.
 
@@ -58,9 +58,12 @@ Run the build command from CLAUDE.md. Report the installer location from CLAUDE.
 ## 9. Migrations
 List every line in this version's changelog entries that says a migration is required (for example "Migration NNN required."). If there are any, remind the user to take the steps in CLAUDE.md's "Backup before a migration" line before running them (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until they are run. If there are none, say so.
 
+Last of all, if step 1 found changes still being coded, list them again as not part of this version.
+
 ## Never
 - Create a change number, plan or review record for a build.
 - Edit code, or fix a problem the checks or the review found.
 - Edit anything in the data folder (CLAUDE.md's "Data folder" line) or run anything against it.
 - Force-push, or push any branch other than the default branch and the tag.
 - Make a version in any other way. A check-in never does.
+- Touch a working branch or worktree of a change still being coded. Such a change catches up with the release commit at its own check-in.

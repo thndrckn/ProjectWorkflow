@@ -1,6 +1,6 @@
 ---
 name: commit-change
-description: Last step of the workflow, run by the user after /code-change. Verifies the records (checking a new-format review record against the review-accountability gate and stopping with a plain-English list of failures), catches the branch up with the default branch, merges the branch into the default branch, pushes, deletes the branch, and reports. Never writes the change records itself, except for review notes on code changed while resolving a merge conflict.
+description: Last step of the workflow, run by the user after /code-change. Verifies the records (checking a new-format review record against the review-accountability gate and stopping with a plain-English list of failures), catches the branch up with the default branch, merges the branch into the default branch, pushes, removes the change's worktree and deletes the branch, and reports. Never writes the change records itself, except for review notes on code changed while resolving a merge conflict.
 disable-model-invocation: true
 ---
 
@@ -13,7 +13,8 @@ The default branch and the checks come from the Workflow section of CLAUDE.md. W
 The user typing `/commit-change` is their go-ahead. Follow these steps in order, and only stop where a step says STOP.
 
 ## 1. Safety checks
-- Confirm you are on a working branch, not the default branch. If you are on the default branch, STOP and tell the user there is nothing to check in.
+A change is normally coded in its own worktree, and `/commit-change` is typed in the same chat. Steps 1 to 4 run inside the worktree; step 5 steps back out to the default branch's folder.
+- Confirm you are on a working branch, not the default branch. If you are on the default branch, look for the change to check in: if the user named one, or exactly one worktree is in flight (`git worktree list`), enter that worktree with `EnterWorktree` and its `path` and carry on; if there are several and none was named, ask which, in the question box. If there is none, STOP and tell the user there is nothing to check in.
 - Confirm the branch has commits that the default branch doesn't (`git log <default>..HEAD --oneline`). If not, STOP.
 - Confirm there are no uncommitted changes. If there are, show them and STOP.
 - Fetch from GitHub and confirm the default branch matches `origin/<default>`. If it doesn't, STOP and tell the user in plain English.
@@ -50,28 +51,33 @@ Tell the user in one line what's about to happen, for example:
 ## 4. Catch up with the default branch
 Only needed if the default branch has commits the working branch doesn't (`git log HEAD..<default> --oneline` is not empty). If it is empty, skip this step.
 - Bring the branch up to date by merging the default branch into it (`git merge <default>`). Never rebase: the approved-plan commit must keep its hash.
-- If the merge reports any conflict, run `git merge --abort`, STOP, and tell the user in plain English which files conflict. Ask how they want to proceed. Do not guess a resolution.
-- After the merge, run every check under "Checks (all must pass)" in CLAUDE.md again on the combined code, plus every check under "Checks (only when relevant)" whose condition applies. Run each as its own command, and never leave the shell in a different directory afterwards. If any check fails, STOP and report in plain English.
+- If the merge reports any conflict, list the conflicted files (`git diff --name-only --diff-filter=U`).
+  - **Only `CHANGELOG.md` conflicts**, and this change's own diff to it adds nothing but this change's entry (`git diff <merge-base> HEAD -- CHANGELOG.md` shows only added lines belonging to this change number): changes in flight at the same time all add their line at the top of Unreleased, so this is expected. Resolve it yourself: take the default branch's version of the file (`git checkout --theirs CHANGELOG.md`), add this change's entry (taken from `git show HEAD:CHANGELOG.md`, exactly as written) at the top of its `## [Unreleased]` list, and stage it. Then check that `git diff <default> -- CHANGELOG.md` shows only this change's entry as added, and finish the merge commit. Tell the user in one plain line that you kept both entries.
+  - **Anything else** (another file as well, or a CHANGELOG change that is more than this change's entry): run `git merge --abort`, STOP, and tell the user in plain English which files conflict. Ask how they want to proceed. Do not guess a resolution.
+- **Migration clash:** if CLAUDE.md has a "Migrations" line, then after the merge (conflict or not) check the migrations folder it names: no two migration files may share a number, and the schema version it says is set in a named place must still match the highest migration number, as the line describes (two changes can each bump it to the same value and merge cleanly). On either failure, STOP and tell the user in plain English which files clash. Do not renumber anything: the fix goes through `/code-change` on this branch. If CLAUDE.md has no "Migrations" line, skip this check and say so.
+- After the merge, run every check under "Checks (all must pass)" in CLAUDE.md again on the combined code, plus every check under "Checks (only when relevant)" whose condition applies. Run each as its own command, and never leave the shell in a different directory afterwards. In a worktree, set the environment CLAUDE.md's "Worktree check environment" line gives for the checks it names (if CLAUDE.md has no such line, run them as they are). If any check fails, STOP and report in plain English.
 - Run `git diff <approved-plan commit> -- <plan file>` again. It must still show no changes.
 - If resolving a conflict changed code (only possible after the user told you how to resolve it), review those changes and record them in the change's review record: add a "Merge conflict resolution" section to `docs/reviews/<plan file name>.md` that lists the files, what was decided and why, and the review result, then commit it on the branch as `docs(<NUMBER>): record merge conflict resolution`. A merge with no conflicts changes no records.
 
 ## 5. Merge and publish
-- Switch to the default branch and merge with `git merge --no-ff <branch>`, using the plan's commit message for the merge commit. If the merge reports a conflict, run `git merge --abort`, STOP, and tell the user in plain English. Do not push or delete anything.
-- Push the default branch to GitHub. If the push is rejected, STOP and tell the user in plain English. Do not delete the branch, and do not force-push; say that the local default branch is ahead of GitHub.
-- Only after the push succeeds, delete the working branch with `git branch -d <branch>` (never `-D`).
+- If the work is in a worktree: the default branch can only be merged in the main folder, and a chat inside a worktree can't touch it. Note the worktree's path, then leave it with `ExitWorktree` (`keep`), which returns the chat to the main folder. If the chat can't leave the worktree that way (for example it was resumed), STOP and tell the user to type `/commit-change` from a chat in the main folder, naming the change.
+- In the main folder, make sure the default branch is the one checked out and merge with `git merge --no-ff <branch>`, using the plan's commit message for the merge commit. If the merge reports a conflict, run `git merge --abort`, STOP, and tell the user in plain English. Do not push or delete anything.
+- Push the default branch to GitHub. If the push is rejected, STOP and tell the user in plain English. Do not delete the branch or the worktree, and do not force-push; say that the local default branch is ahead of GitHub.
+- Only after the push succeeds, remove the worktree, if there is one, with `git worktree remove <path>` (never forced), then delete the working branch with `git branch -d <branch>` (never `-D`). The removal deletes everything inside the worktree folder, including its own installed packages, build folder and database, and nothing outside it. If it can't finish (for example a file is locked because the worktree's app or an editor is still open), do not force it: say plainly what is left and what the user must close or delete by hand, and still delete the branch only if the worktree is gone.
 
 ## 6. Report
 Tell the user in plain English:
 - The change number and title that were checked in.
-- That the default branch is on GitHub.
+- That the default branch is on GitHub, and, for a change coded in a worktree, that the worktree and branch are gone (or exactly what is left).
 - Anything they still need to do by hand, such as running a new migration: the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask them how to back up).
 - Last of all, only if the plan has an "Original request (set aside)" section: end the report with a one-line lead-in saying the original request is still waiting, then a fenced code block holding `/plan-change ` followed on the same line by the recorded request exactly as written in the plan (any further lines unchanged, nothing trimmed or rewrapped), ready to paste. Use a fence longer than any run of backticks inside the request (or a `~~~` fence, longer than any run of tildes inside it). Nothing comes after it. If the plan has no such section, add nothing.
 
 ## Never
 - Merge without completing steps 1–4.
 - Merge a new-format change whose review record fails the review gate in step 2.
-- Write or change the plan, the review record, or the CHANGELOG entry. The one exception is the merge-conflict section in step 4. If anything else is wrong, STOP and say so.
+- Write or change the plan, the review record, or the CHANGELOG entry. The exceptions are the merge-conflict section in step 4 and keeping both entries when only `CHANGELOG.md` conflicts in the catch-up merge. If anything else is wrong, STOP and say so.
 - Rebase.
 - Push any branch other than the default branch, or force-push anything.
+- Force-remove a worktree, or delete anything outside the worktree's own folder.
 - Run anything against files in the data folder (CLAUDE.md's "Data folder" line).
 - Leave the default branch ahead of GitHub.
