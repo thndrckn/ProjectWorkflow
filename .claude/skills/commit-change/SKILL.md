@@ -27,15 +27,15 @@ Find the plan for this branch in `docs/plans/` (its change number is in the bran
 If anything is missing or the plan changed, STOP and tell the user exactly what's wrong. Do not write or fix the records yourself; that is `/code-change`'s job.
 
 ### Review gate
-Read the review record. The gate applies only to a record in the new format: one with a `- **Review format:** accountability` line in its header, or with any "Caused by this change" line anywhere in it (so deleting the marker doesn't dodge the gate). A record with neither is in the old format and is exempt; say so in one line and go on to step 3.
+Read the review record. The gate applies only to a record in the new format: one with a line that starts `- **Review format:** accountability` in its header, or with any line that starts (after any leading spaces) `**Caused by this change:**` (so deleting the marker doesn't dodge the gate). Prose that merely mentions the phrase mid-line doesn't count. A record with neither is in the old format and is exempt; say so in one line and go on to step 3.
 
-For a new-format record, check every rule below. Collect all failures before stopping, not just the first.
-1. **Labels:** every finding has a severity and a "Caused by this change: yes/no" line, and a disposition.
+For a new-format record, check every rule below. Read each finding as corrected by its latest `**Correction (round N):**` line, if it has one. Collect all failures before stopping, not just the first.
+1. **Labels:** every finding has a severity, a "Caused by this change: yes/no" line, and a disposition.
 2. **Caused findings:** no finding labelled "yes" has the disposition "logged in KNOWN_ISSUES.md", and none is left open or "accepted as is". Each is "fixed" or "explained".
-3. **Re-review happened:** if any finding's disposition is anything other than plain "fixed" (including any logged item or any disputed label), the record has a Re-review section.
-4. **Everything was checked:** in the last re-review round, every explanation is marked accepted by the re-reviewer, every logged item has its "caused: no" label confirmed, and every fix is marked accepted. A rejected explanation counts as a failure unless the record shows it was then fixed, or logged with the label confirmed, in a later round, or settled by the user's answer.
-5. **The loop finished:** the last round is marked clean, and there are no more than three rounds. A third round that isn't clean, or any finding with no disposition, is a failure.
-6. **Failed requirements:** no row in the requirements trace is Fail.
+3. **Re-review happened:** if any finding's disposition is anything other than plain "fixed" (including any logged item or any disputed label), or any requirement Fail was fixed, the record has a Re-review section with at least one round. If every finding is plainly "fixed" and no Fail was fixed, no Re-review section is needed, and rules 4 and 5 are met.
+4. **Everything was checked:** in every re-review round, each explanation, logged item (its "caused: no" label) and fix it covered is marked accepted by the re-reviewer. A rejection is a failure unless the record shows it was resolved in a later round (fixed, or logged with the label confirmed) or carries "Settled by the user: <answer>".
+5. **The loop finished:** if there are re-review rounds, the last round is marked clean, or every item still open carries "Settled by the user: <answer>". There are no more than three rounds, plus at most one extra round that the record says was needed to check a fix made after a gate failure. A finding with no disposition is a failure.
+6. **Failed requirements:** no row in the requirements trace has a result that starts with Fail (so "Fail (checked by Claude)" counts too).
 
 If any rule fails, STOP and list every failure in plain English, one line each, naming the finding or requirement. Tell the user that running `/code-change` on this branch will continue the change (fix, re-run the checks, re-review and append to the record). Do not merge, push or write anything.
 
