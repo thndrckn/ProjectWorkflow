@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-014 (chore) When "Plan it now" sets aside your original /plan-change request, the plan now records it word for word, and /commit-change's final report ends with it as a ready-to-paste /plan-change command.
 - PWF-013 (chore) The inert plan-renaming script, its after-plan-mode hook entry and the plan-folder setting are removed from the project settings; plan mode stays blocked. The matching backlog entry is removed.
 - PWF-012 (chore) The shared policy's change-number and commit-message examples now use the neutral `ABC-085` instead of this project's real `DTP-085`; the matching backlog entry is removed.
 - PWF-011 (chore) Three plan rules added to /plan-change and the shared policy (no made-up changes in tests, workflow changes are chore, no project-specific wording in shared skills and hooks), and the skills' stack wording moved into new CLAUDE.md lines (lockfile commands, installer location, data folder).

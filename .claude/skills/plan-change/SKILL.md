@@ -29,7 +29,7 @@ Never skip the interview or the play-back. If the request already answers everyt
 
 ## 3. Put the backlog to the user
 Read `docs/BACKLOG.md`. If it is missing or has no entries, say nothing and go to step 4. Otherwise, before the interview, put every entry to the user, new and queued alike, one at a time, in the question box (AskUserQuestion), one question per box, in the order they appear in the file. Asking every time is deliberate: it keeps the backlog small. Show the entry's title, where it was found, its severity and what is wrong, and offer exactly three choices:
-- **Plan it now.** Planning switches to that item: it becomes this change (the number from step 2 stays with it), and your interview is about the item, not the original request. Ask no more backlog questions; the remaining items wait for the next `/plan-change`. Tell the user plainly that their original request needs its own `/plan-change`. The plan names the item in a "Backlog items fixed" line.
+- **Plan it now.** Planning switches to that item: it becomes this change (the number from step 2 stays with it), and your interview is about the item, not the original request. Ask no more backlog questions; the remaining items wait for the next `/plan-change`. Tell the user plainly that their original request needs its own `/plan-change`. If the original request is not empty (it is empty if it is missing or only whitespace), keep it exactly as the user typed it, word for word, taken from the raw command arguments and never from your own summary of them, and write it into the plan under "Original request (set aside)". The plan names the item in a "Backlog items fixed" line.
 - **Keep it queued.** Nothing changes. Go to the next item.
 - **Accept it.** Ask for the reason in a follow-up question box. Nothing is written now (the default branch is protected): the plan lists the item and the reason under "Backlog items accepted", and `/code-change` adds it to `docs/DECISIONS.md` and removes it from the backlog.
 
@@ -79,6 +79,9 @@ Use exactly this format. The top sections are for the user: plain English, no co
 
 ## Backlog items accepted
 <Only when the user accepted items: each title with the user's reason. /code-change adds them to docs/DECISIONS.md and removes them from the backlog. Leave this section out otherwise.>
+
+## Original request (set aside)
+<Only when "Plan it now" set aside a non-empty original request: that request, word for word, exactly as the user typed it, in a fenced block whose fence is longer than any run of backticks inside the request (or use a `~~~` fence, longer than any run of tildes inside it), so the text is never altered, trimmed or rewrapped. Leave this section out otherwise.>
 
 ## What could go wrong / what gets lost
 <Data loss, migrations to run by hand, risky changes. Always present. Write "Nothing" if so.>
