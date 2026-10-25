@@ -4,7 +4,7 @@
 - **Review format:** accountability
 - **Plan:** docs/plans/PWF-018-enter-worktree.md (approved in commit ac99556)
 - **Branch:** chore/PWF-018-enter-worktree
-- **Reviewer:** independent Standards, Spec and Correctness reviewers; a re-review ran (2 rounds)
+- **Reviewer:** independent Standards, Spec and Correctness reviewers; a re-review ran (3 rounds)
 - **Scope:** diff of chore/PWF-018-enter-worktree against master — 2 skill files changed (.claude/skills/code-change/SKILL.md, .claude/skills/commit-change/SKILL.md), about 9 lines (plus the plan file)
 
 ## Findings
@@ -56,6 +56,7 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 - **[Nit]** (round 2) The commit-change step 1 sub-bullet sits between the bullets that make up step 1's checks — .claude/skills/commit-change/SKILL.md
   **Caused by this change:** yes
   **Disposition:** explained (entering is conditional on being on the default branch, and the main bullet's "as described next" signals that; the reviewer said no action is needed). Settled by the user: both are no-action remarks; no further round needed.
+  **Correction (round 3):** the user reversed this settlement for the Nit and asked for a fix. It is now fixed: the entering procedure is its own top-level bullet, "Entering the worktree (only when you started on the default branch)", directly after the bullet that finds the change, so step 1 reads in order. The round 3 re-reviewer accepted the fix. The Informational below stays explained.
 - **[Informational]** (round 2) The main bullet's "carry on" relies on the sub-bullet for the failure STOP — .claude/skills/commit-change/SKILL.md
   **Caused by this change:** no
   **Disposition:** explained (observation; the sub-bullet states each STOP). Settled by the user: both are no-action remarks; no further round needed.
@@ -69,6 +70,11 @@ Triggered by the fixes, explanations and an observation from the first review. T
 Triggered by the round 1 findings: one explained and one fixed. The re-reviewer accepted both. It reported "New findings: none" but added two remarks it said need no action, a Nit and an Informational. Under the rules any new finding makes a round not clean, so this round is not clean. Both are recorded above as findings (marked round 2), with the reviewer's labels.
 
 Settled by the user: both are no-action remarks; no further round needed.
+
+The user later reversed the settlement for the Nit (see the correction under that finding) and asked for it to be fixed and re-reviewed; the Informational stays settled as explained.
+
+### Round 3
+Triggered by the fix for the round 2 Nit (the entering procedure moved into its own bullet, commit 5877bf0). The re-reviewer accepted the fix: step 1 reads in order, every failure still STOPs, and the bullet's other branches (several worktrees, none in flight) are intact. It accepted the explanation for the Informational. It raised no new finding and had no remark to make. Clean. This is the third round, within the limit.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -85,4 +91,4 @@ The plan's live check (T2) needs the next real change and the user at a coding c
 None. Two small additions beyond the plan's wording, both from review: the STOP also tells the user where the worktree is, and commit-change step 1 checks the branch after entering. Both serve R2 and R4.
 
 ## Summary
-The two shared skills now say to load the worktree tools before calling them, to check the folder and branch after entering, and to stop in plain English when entry fails. Checks pass (384 Rust tests, clippy, fmt, lint, Vite build). Two re-review rounds ran; round 2 was not clean, and the user settled its two no-action remarks and ruled out a further round; the plan is untouched. The live confirmation is plan test T2 on the next real change.
+The two shared skills now say to load the worktree tools before calling them, to check the folder and branch after entering, and to stop in plain English when entry fails. Checks pass (384 Rust tests, clippy, fmt, lint, Vite build). Three re-review rounds ran. Round 2 was not clean; the user first settled its two remarks as no-action, then reversed that for the Nit, which was fixed and accepted in a clean round 3. The plan is untouched. The live confirmation is plan test T2 on the next real change.
