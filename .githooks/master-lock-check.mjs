@@ -94,12 +94,19 @@ function findingBlocks(body) {
   const lines = body.split('\n');
   const blocks = [];
   for (let i = 0; i < lines.length; i++) {
-    const startsBracket = /^- \*\*\[[^\]]*\]\*\*/.test(lines[i]);
-    const startsPlain = /^- (?!\*\*\[)/.test(lines[i]) && /^\s+\*\*Caused by this change:\*\*/.test(lines[i + 1] || '');
-    if (!startsBracket && !startsPlain) continue;
+    if (!/^- /.test(lines[i])) continue;
     const block = [lines[i]];
-    while (i + 1 < lines.length && /^\s+\S/.test(lines[i + 1])) block.push(lines[++i]);
-    blocks.push(block.join('\n'));
+    // The block runs over indented lines, and over blank lines that are followed by more indented text.
+    for (let j = i + 1; j < lines.length; j++) {
+      if (lines[j].trim() === '') continue;
+      if (!/^\s+\S/.test(lines[j])) break;
+      block.push(...lines.slice(i + 1, j + 1));
+      i = j;
+    }
+    const text = block.join('\n');
+    // A bullet is a finding if it has the severity form, or carries a finding's own labelled lines
+    // (so a finding written without the severity form is caught and refused, not skipped).
+    if (/^- \*\*\[[^\]]*\]\*\*/.test(text) || /\*\*(?:Caused by this change|Disposition):\*\*/.test(text)) blocks.push(text);
   }
   return blocks;
 }
@@ -198,8 +205,14 @@ function evaluateRecord(raw) {
       failures.push(`The re-review loop did not finish: the last round (round ${last.n}) is not clean and is not settled by the user.`);
     }
     rounds.forEach((r, idx) => {
-      if (idx >= 3 && !/Settled by the user:/.test(r.text)) {
+      const settled = /Settled by the user:/.test(r.text);
+      if (idx >= 3 && !settled) {
         failures.push(`Round ${r.n} is beyond the third and does not carry "Settled by the user:" authorising it.`);
+      }
+      // The re-reviewer's verdict on the outcomes it checked has to be written down in every round.
+      // (The records word the verdict in several ways: accepted, resolved, confirmed, verified.)
+      if (!settled && !/\b(?:accept\w*|resolved|confirm\w*|verified)\b/i.test(r.text)) {
+        failures.push(`Round ${r.n} does not say whether the re-reviewer accepted the outcomes it checked.`);
       }
     });
   }
@@ -288,6 +301,29 @@ function checkRange(oldTip, newTip, cfg) {
   return problems;
 }
 
+// The default branch as git itself knows it: where the remote's HEAD points, and init.defaultBranch.
+function gitDefaultBranchHints() {
+  const hints = [];
+  const head = gitTry(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']);
+  if (head && head.trim().includes('/')) hints.push(head.trim().slice(head.trim().indexOf('/') + 1));
+  const init = gitTry(['config', '--get', 'init.defaultBranch']);
+  if (init && init.trim()) hints.push(init.trim());
+  return hints;
+}
+
+// A check-in may not loosen or change the lock's own settings: raising the starting number,
+// adding version files (they widen what a release commit may touch), or changing the prefix
+// or default branch. Changing them is the user's step, with the lock off by hand.
+function loosenedSettings(before, after) {
+  const changed = [];
+  if (after.defaultBranch !== before.defaultBranch) changed.push('the default branch');
+  if (after.prefix !== before.prefix) changed.push('the change prefix');
+  if (after.start > before.start) changed.push('the starting number (raised)');
+  const added = after.versionFiles.filter((f) => !before.versionFiles.includes(f));
+  if (added.length > 0) changed.push(`the version files (added ${added.join(', ')})`);
+  return changed;
+}
+
 function hookMode(state) {
   const input = fs.readFileSync(0, 'utf8');
   if (state !== 'prepared') return 0;
@@ -307,7 +343,19 @@ function hookMode(state) {
     }
     const claudeOld = gitTry(['show', `${oldTip}:CLAUDE.md`]);
     const defaultName = claudeOld === null ? null : defaultBranchOf(claudeOld);
-    if (!defaultName || ref !== `refs/heads/${defaultName}`) continue; // not the default branch
+    if (!defaultName) {
+      // Without CLAUDE.md's "Default branch" line the branch cannot be recognised that way, so
+      // fall back on what git itself says the default branch is, and refuse if this is it.
+      const short = ref.slice('refs/heads/'.length);
+      if (gitDefaultBranchHints().includes(short)) {
+        problemsByBranch.push({
+          branch: short,
+          problems: ['The lock\'s settings cannot be read: CLAUDE.md is missing, or has no "Default branch" line, at the current tip of this branch.'],
+        });
+      }
+      continue;
+    }
+    if (ref !== `refs/heads/${defaultName}`) continue; // not the default branch
     const cfg = readConfig(claudeOld);
     const problems = [];
     if (!cfg.ok) {
@@ -321,6 +369,12 @@ function hookMode(state) {
       const claudeNew = gitTry(['show', `${newV}:CLAUDE.md`]);
       const cfgNew = readConfig(claudeNew);
       if (!cfgNew.ok) problems.push(...cfgNew.problems.map((p) => `The update would leave the lock without its settings: ${p}.`));
+      else {
+        const changed = loosenedSettings(cfg, cfgNew);
+        if (changed.length > 0) {
+          problems.push(`A check-in cannot loosen or change the lock's settings in CLAUDE.md (${changed.join('; ')}); the user does that by hand, see CLAUDE.md, "Master lock".`);
+        }
+      }
     }
     if (problems.length > 0) problemsByBranch.push({ branch: defaultName, problems });
   }

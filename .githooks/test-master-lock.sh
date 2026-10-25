@@ -21,7 +21,7 @@ g() { git -C "$r" "$@"; }
 # new_repo <name> [prefix] [default branch] [start number] [omit: prefix|lock|version|badlock]
 # A repo whose first commit predates the lock being switched on, like a real project.
 new_repo() {
-  local name=$1 p=${2:-ABC} d=${3:-master} s=${4:-010} omit=${5:-}
+  local name=$1 p=${2:-ABC} d=${3:-master} s=${4:-010} omit=${5:-}   # omit: prefix|lock|version|badlock|claude
   r="$tmp/$name"; def=$d; pfx=$p
   git init -q -b "$d" "$r"
   mkdir -p "$r/.githooks" "$r/docs/reviews"
@@ -34,6 +34,7 @@ new_repo() {
     if [ "$omit" = badlock ]; then printf -- '- **Master lock starts at:** `%s-1x`\n' "$p"
     elif [ "$omit" != lock ]; then printf -- '- **Master lock starts at:** `%s-%s`\n' "$p" "$s"; fi
   } > "$r/CLAUDE.md"
+  [ "$omit" != claude ] || rm "$r/CLAUDE.md"
   printf '{}\n' > "$r/package.json"; mkdir -p "$r/app" "$r/src"; printf '1\n' > "$r/app/version.txt"
   printf '# Changelog\n' > "$r/CHANGELOG.md"
   g add -A
@@ -65,6 +66,17 @@ It accepted every fix and raised no new finding. Round clean: yes.
   **Caused by this change:** yes
   **Disposition:** logged in docs/BACKLOG.md
   **Settled by the user:** \"fine as it is\"" ;;
+    blankline) finding="- **[Low]** a thing — f.js
+  **Caused by this change:** yes
+
+  **Disposition:** fixed (how)" ;;
+    plainbullet) finding="- a thing — f.js
+  **Disposition:** fixed (how)" ;;
+    noaccept) rereview="## Re-review
+
+### Round 1
+Looked at it. Round clean: yes.
+" ;;
     norereview) rereview="" ;;
     rejected) rereview="## Re-review
 
@@ -184,6 +196,9 @@ attempt "fourth round not authorised" refused "beyond the third" commit_with ABC
 attempt "failed requirement" refused "failed its test" commit_with ABC-036 failrow "feat(ABC-036): x"
 attempt "caused finding logged but settled by the user" ok "" commit_with ABC-037 settled "feat(ABC-037): x"
 attempt "a clean record" ok "" commit_with ABC-038 ok "feat(ABC-038): x"
+attempt "a round that does not record the re-reviewer's verdict" refused "does not say whether the re-reviewer accepted" commit_with ABC-039 noaccept "feat(ABC-039): x"
+attempt "a finding written without the severity form" refused "has no severity" commit_with ABC-040 plainbullet "feat(ABC-040): x"
+attempt "a blank line inside a finding" ok "" commit_with ABC-041 blankline "feat(ABC-041): x"
 
 echo "== R4: commits with no usable change number"
 new_repo r4
@@ -237,9 +252,24 @@ new_repo r10f
 printf -- '- **Default branch:** `master`\n' > "$r/CLAUDE.md"; g add -A
 attempt "a change that would strip the lock's settings" refused "without its settings" g commit -q -m "feat(ABC-061): x"
 g reset -q --hard
+new_repo r10g ABC master 010 claude
+g config init.defaultBranch master
+attempt "no CLAUDE.md at all at the current tip" refused "settings cannot be read" commit_with ABC-020 ok "feat(ABC-020): x"
+new_repo r10h
 attempt "deleting the default branch" refused "cannot be deleted" bash -c "git -C '$r' update-ref -d refs/heads/master"
 check "a line the hook cannot read" 2 "refuses" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/master-lock-check.mjs hook prepared )"
 check "a state other than prepared is ignored" 0 "" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/master-lock-check.mjs hook committed )"
+
+echo "== R10: a check-in cannot loosen the lock's own settings"
+new_repo r10s
+# change_settings <sed expression> <number> <message>: a numbered change with a passing record that also edits CLAUDE.md
+change_settings() { sed -i "$1" "$r/CLAUDE.md"; commit_with "$2" ok "$3"; }
+attempt "raising the starting number" refused "starting number (raised)" change_settings 's/ABC-010/ABC-500/' ABC-080 "feat(ABC-080): x"
+attempt "adding a version file" refused "added src/a.txt" change_settings 's/`app\/version.txt`/`app\/version.txt`, `src\/a.txt`/' ABC-081 "feat(ABC-081): x"
+attempt "changing the change prefix" refused "" change_settings 's/`ABC`/`XYZ`/' ABC-082 "feat(ABC-082): x"
+attempt "changing the default branch name" refused "the default branch" change_settings 's/`master`/`trunk`/' ABC-083 "feat(ABC-083): x"
+attempt "lowering the starting number" ok "" change_settings 's/ABC-010/ABC-005/' ABC-084 "feat(ABC-084): x"
+attempt "narrowing the version files" ok "" change_settings 's/`package.json`, //' ABC-085 "feat(ABC-085): x"
 
 echo "== R11: the settings come from CLAUDE.md"
 new_repo r11 XYZ trunk 050
