@@ -53,8 +53,13 @@ Work the frontier with these rules:
 
 ## 5. Play it back
 Draft the requirements from the interview. Every plan has at least one requirement, whatever its type. Each is a numbered Given / When / Then case (R1, R2, …) in plain English that can be checked on its own.
-Sum up the shared understanding in a few plain-English sentences, list the proposed requirements, and list every question asked so far (backlog and interview) with the user's answer. Then ask: "Is that right?"
-Wait for a yes. A yes covers the requirements too. If the user corrects anything, including a requirement, fix your understanding and play it back again.
+Every play-back uses the same fixed format, so it looks the same in every chat. Write it as a normal message, with these parts in this order:
+1. **Summary:** a few plain sentences.
+2. **Requirements:** R1, R2, … one per line.
+3. **Decisions so far:** a table of every question asked so far (backlog and interview) with the user's answer.
+
+End the message with "Is that right?" as plain text. Never put the play-back in a question box, because the box cannot hold a long play-back and gives no room to write changes (the interview questions in step 4 still use it). The user answers yes, or writes their changes, in the normal chat input.
+Wait for a yes. A yes covers the requirements too. A reply that adds any change, even "yes, but …", is a change, not a yes. If the user writes changes, including to a requirement, fix your understanding and play it back again in the same format, saying at the top what changed. If the reply is a question or unclear, answer it or ask what they mean, then end with "Is that right?" again.
 
 ## 6. Write the plan file
 Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated. Then delete this change's own placeholder file from step 2.
