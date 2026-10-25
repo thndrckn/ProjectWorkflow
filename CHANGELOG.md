@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-020 (chore) Every /plan-change play-back now uses one fixed format: a normal message with a Summary, the Requirements and the Decisions so far, ending in "Is that right?" as plain text (no question box); a corrected play-back says at the top what changed.
 - PWF-018 (chore) /code-change now loads the worktree tools, enters the worktree and checks the folder and branch, stopping if it can't, so /commit-change can step out of it from the same chat; /commit-change loads the tools too.
 - PWF-016 (chore) A by-design reason tied to one spot in the code now goes in a "why" comment at that spot, a project-wide one in docs/DECISIONS.md; /code-change and the Standards reviewer follow the rule, and the shared policy states it.
 - PWF-015 (chore) Each change is now coded in its own worktree, so several can be coded at once in separate chats: /plan-change claims change and migration numbers at once, /code-change works in a worktree with its own empty database and dev-server port, /commit-change merges from it, resolves a changelog-only clash and removes it, /build-changes builds what is merged while others are open, and the guard hook protects master from every folder.
