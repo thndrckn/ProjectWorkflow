@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-019 (chore) The rules in CLAUDE.md and the shared policy that a program can check are now checked on every change: lint enforces the TypeScript ones (invoke only in api.ts, thin api.ts wrappers, no new Date(text), no browser dialogs, no inline styles, no frontend network calls, lucide-react icons only), and a new `npm run check:conventions` covers SQL, network code, command registration, types.ts vs models.rs, migrations and the dark-only palette; `npm run test:conventions` proves each rule catches a violation.
 - PWF-018 (chore) /code-change now loads the worktree tools, enters the worktree and checks the folder and branch, stopping if it can't, so /commit-change can step out of it from the same chat; /commit-change loads the tools too.
 - PWF-016 (chore) A by-design reason tied to one spot in the code now goes in a "why" comment at that spot, a project-wide one in docs/DECISIONS.md; /code-change and the Standards reviewer follow the rule, and the shared policy states it.
 - PWF-015 (chore) Each change is now coded in its own worktree, so several can be coded at once in separate chats: /plan-change claims change and migration numbers at once, /code-change works in a worktree with its own empty database and dev-server port, /commit-change merges from it, resolves a changelog-only clash and removes it, /build-changes builds what is merged while others are open, and the guard hook protects master from every folder.
