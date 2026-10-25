@@ -165,7 +165,8 @@ for c in "GIT_DIR=$master/.git git reset --hard" "GIT_WORK_TREE=$master git rese
   "git config set core.worktree $master" 'git config set --worktree core.bare true' \
   "git config --file $master/.git/config core.worktree X" 'git config -f x core.worktree y' \
   'git config --type path core.worktree X' "git config -f $master/.git/config user.name x" \
-  "git config --file=$master/.git/config user.name x"; do
+  "git config --file=$master/.git/config user.name x" "git config -f$master/.git/config user.name x" \
+  'git config -fx core.worktree y'; do
   bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
 done
 for c in 'git push -u origin chore/ABC-001-w' 'git push' 'git branch -d other' 'git branch --show-current' \
@@ -174,7 +175,7 @@ for c in 'git push -u origin chore/ABC-001-w' 'git push' 'git branch -d other' '
   'git -cuser.name=x commit -m x' 'git fetch origin' 'git fetch origin master' 'git config user.name x' \
   'git config core.worktree' 'git --namespace foo status' 'git config set user.name x' \
   'git config -f .gitmodules user.name x' 'git config --type bool user.thing true' \
-  "git config --file $wt/.git user.name x"; do
+  "git config --file $wt/.git user.name x" 'git config -f.gitmodules user.name x'; do
   bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
 done
 for t in Edit Write; do

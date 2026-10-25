@@ -366,6 +366,7 @@ function worktreeRefRule(sub, rest) {
       const a = rest[k];
       if (a === '-f' || (isLong(a, '--file') && !a.includes('='))) file = rest[++k] || '';
       else if (isLong(a, '--file')) file = a.slice(a.indexOf('=') + 1);
+      else if (/^-f./.test(a)) file = a.slice(2); // attached: -f<path>
       else if (!a.startsWith('-')) words.push(a);
     }
     if (words.length >= 2 && words.some((w) => /^core\.(worktree|bare)$/i.test(w))) {
