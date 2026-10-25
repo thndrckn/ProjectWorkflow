@@ -40,6 +40,7 @@ Severity and caused label are the reviewer's, never changed by the author.
 - **[Low]** R12 catches hex colours only, and could flag an id selector such as `#add` — scripts/check-conventions.mjs
   **Caused by this change:** yes
   **Disposition:** fixed for the false positives (only declaration blocks scanned, `url()` removed). Explained for `rgba()`: the plan's play-back and CLAUDE.md's palette are hex tokens, App.css has 6 existing `rgba()` overlays and the plan says existing code is not rewritten, so flagging them needs CSS changes outside the plan.
+  **Correction (round 3):** the explanation for `rgba()` is withdrawn. Settled by the user: the colour check covers `rgba()` and the other colour functions too, with the 6 existing `rgba()` overlays in App.css in the check's commented allow-list so existing code is not rewritten and new ones are caught. Fixed (`COLOUR_FUNCTION_ALLOWLIST`, test cases added); accepted in round 3.
 - **[Nit]** No test for a conditional api.ts entry — tests/conventions.mjs
   **Caused by this change:** yes
   **Disposition:** fixed (test added)
@@ -63,6 +64,7 @@ Severity and caused label are the reviewer's, never changed by the author.
 - **[Low]** R12 colour check is hex-only, over-matches id selectors and exempts only the first `:root` block — scripts/check-conventions.mjs
   **Caused by this change:** yes
   **Disposition:** fixed (id selectors, `url(#id)`, every `:root` block); `rgba()` explained as above.
+  **Correction (round 3):** the `rgba()` explanation is withdrawn and fixed as in the Spec finding above (Settled by the user: cover `rgba()`, allow-list the 6 existing overlays); accepted in round 3.
 - **[Low]** Coverage gaps: SQL keywords, loader scope, R10 parser edge cases, `.js`/`.jsx` not linted — scripts/check-conventions.mjs, eslint.config.js
   **Caused by this change:** yes
   **Disposition:** fixed for `REPLACE INTO`, `VACUUM`, `ATTACH`/`DETACH DATABASE` and the `.js`/`.jsx` lint scope. Explained for the rest: the R10 parser edge cases (multi-line serde attributes, raw identifiers, quoted TypeScript keys, other indentation) and the extra folders (`src-tauri/tests`, `build.rs`) do not occur in the repo, and the R10 edge cases fail loudly (a field mismatch is reported) rather than passing silently. `WITH` was not added: a common word, and a CTE needs `SELECT` anyway.
@@ -86,6 +88,9 @@ Triggered by the fixes and explanations above. A fresh re-reviewer was given the
 ### Round 2
 A new fresh re-reviewer checked the fix to the round 1 Nit: accepted, with the lint, convention and proof commands run (82/82 cases). No new findings. Clean.
 
+### Round 3
+Triggered by the user's decision to withdraw the `rgba()` explanation (Settled by the user: the colour check covers `rgba()` and the other colour functions, the 6 existing App.css overlays go in the commented allow-list, add a test case). A third fresh re-reviewer checked the fix: accepted. It confirmed the real-tree counts match the allow-list exactly (`rgba(0, 0, 0, 0.4)` x3, `0.5` x1, `0.55` x2), that the one `rgba()` in index.css is a `:root` token and correctly exempt, and that property names such as `background-color:`, `var()`, nested `color-mix`, `url()`, `@media` blocks and whitespace differences behave correctly. It ran the convention check and 89/89 proof cases. No new findings. Clean.
+
 ## Requirements trace
 | Requirement | Test | Result |
 |---|---|---|
@@ -100,12 +105,13 @@ A new fresh re-reviewer checked the fix to the round 1 Nit: accepted, with the l
 | R9 | tests/conventions.mjs: command missing from lib.rs or api.ts, orphan wrapper and orphan registration fail | Pass |
 | R10 | tests/conventions.mjs: missing field, extra field, struct with no interface, interface with no struct and rename fail; matching pair and skipped field pass | Pass |
 | R11 | tests/conventions.mjs: bare CREATE TABLE, rename without drop, wrong or missing stamp, numbering gap and version mismatch fail; correct set and pre-018 files pass | Pass |
-| R12 | tests/conventions.mjs: hex outside :root, prefers-color-scheme and a Tailwind dependency fail; tokens, id selectors and comments pass | Pass |
-| R13 | `npm run test:conventions` (82 cases, each rule with a failing and a passing case) | Pass |
+| R12 | tests/conventions.mjs: hex or rgba()/hsl() outside :root and the allow-list, a stale allow-list entry, prefers-color-scheme and a Tailwind dependency fail; tokens, the allow-listed overlays, id selectors and comments pass | Pass |
+| R13 | `npm run test:conventions` (89 cases, each rule with a failing and a passing case) | Pass |
 | R14 | `npm run lint` and `npm run check:conventions` on the real tree; CLAUDE.md Checks lines read | Pass (checked by Claude) |
 
 ## Deviations from the plan
 - The ESLint scope was widened from `.ts`/`.tsx` to `.js`/`.jsx` files in `src` as well (a Correctness finding), a small addition inside R1–R6.
 - The tests import the script's exported lists rather than repeating them.
+- At the user's request after the first review, R12's colour check covers `rgba()` and the other colour functions as well as hex colours (the plan and play-back named hex only), with the 6 existing App.css overlays in a commented allow-list.
 ## Summary
-The change adds the planned convention checks: ESLint selectors for the TypeScript rules (R1–R6), `scripts/check-conventions.mjs` for the Rust, CSS, migration and cross-file rules (R7–R12), and `tests/conventions.mjs` proving each rule fails on a deliberate violation (R13). CLAUDE.md's Checks list names the new commands (R14). All checks pass on today's code (384 Rust tests, clippy, fmt, lint, convention check, Vite build). Three independent reviewers raised 19 findings, none High; every one was fixed or explained, and two re-review rounds ended clean.
+The change adds the planned convention checks: ESLint selectors for the TypeScript rules (R1–R6), `scripts/check-conventions.mjs` for the Rust, CSS, migration and cross-file rules (R7–R12), and `tests/conventions.mjs` proving each rule fails on a deliberate violation (R13). CLAUDE.md's Checks list names the new commands (R14). All checks pass on today's code (384 Rust tests, clippy, fmt, lint, convention check, Vite build). Three independent reviewers raised 19 findings, none High; every one was fixed or explained, and three re-review rounds ended clean (the third after the user widened the colour check to `rgba()`).
