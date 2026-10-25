@@ -335,13 +335,16 @@ g config core.hooksPath .githooks
 attempt "merging the change that adds the lock, once git already finds its hook" ok "" g merge --no-ff -q lock-intro -m "chore(ABC-002): add the lock"
 attempt "an unnumbered commit afterwards" refused "carries no ABC change number" commit_with x none "fix typo"
 
-echo "== settings complete but the lock's own files absent at the tip: still enforced"
+echo "== complete settings are enforced whatever the lock's own files"
+# The hook files run from outside the repository here, so the check for the lock's files in the tip
+# is false throughout; this pins the settings rule (the file check only matters when the settings
+# are incomplete, which the bootstrap test above covers), not the file check itself.
 new_repo r17
 cp -r "$r/.githooks" "$tmp/r17-hooks"
 g config core.hooksPath "$(cd "$tmp/r17-hooks" && pwd -W 2>/dev/null || pwd)"
 g rm -r -q .githooks
 attempt "moving the hook files out of the repository (a number below the start)" ok "" g commit -q -m "chore(ABC-005): move the hook files out of the repository"
-attempt "an unnumbered commit afterwards is still refused" refused "carries no ABC change number" commit_with x none "fix typo"
+attempt "an unnumbered commit afterwards is still refused, the settings being complete" refused "carries no ABC change number" commit_with x none "fix typo"
 
 echo "== R8: the status check"
 new_repo r8
