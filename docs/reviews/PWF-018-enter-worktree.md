@@ -53,13 +53,22 @@ Every finding is listed, with the severity and caused label the reviewer assigne
   **Caused by this change:** no
   **Disposition:** explained (observation, no inconsistency)
 
+- **[Nit]** (round 2) The commit-change step 1 sub-bullet sits between the bullets that make up step 1's checks — .claude/skills/commit-change/SKILL.md
+  **Caused by this change:** yes
+  **Disposition:** explained (entering is conditional on being on the default branch, and the main bullet's "as described next" signals that; the reviewer said no action is needed). Settled by the user: both are no-action remarks; no further round needed.
+- **[Informational]** (round 2) The main bullet's "carry on" relies on the sub-bullet for the failure STOP — .claude/skills/commit-change/SKILL.md
+  **Caused by this change:** no
+  **Disposition:** explained (observation; the sub-bullet states each STOP). Settled by the user: both are no-action remarks; no further round needed.
+
 ## Re-review
 
 ### Round 1
 Triggered by the fixes, explanations and an observation from the first review. The re-reviewer accepted all 11 outcomes, including confirming that the "caused: no" label on the continue-mode finding is true. It raised three new findings (a Low, a Nit and an Informational, listed above and marked round 1). Not clean, because it raised new findings.
 
 ### Round 2
-Triggered by the round 1 findings: one explained and one fixed. The re-reviewer accepted both. It reported "New findings: none" and added two remarks it said need no action: a Nit (the sub-bullet sits between step 1's checks, signalled adequately by "as described next") and an Informational (the main bullet's "carry on" relies on the sub-bullet for the failure STOP, which states each one). Treated as clean on the reviewer's own statement that it raised no new finding; the two remarks are recorded here.
+Triggered by the round 1 findings: one explained and one fixed. The re-reviewer accepted both. It reported "New findings: none" but added two remarks it said need no action, a Nit and an Informational. Under the rules any new finding makes a round not clean, so this round is not clean. Both are recorded above as findings (marked round 2), with the reviewer's labels.
+
+Settled by the user: both are no-action remarks; no further round needed.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -76,4 +85,4 @@ The plan's live check (T2) needs the next real change and the user at a coding c
 None. Two small additions beyond the plan's wording, both from review: the STOP also tells the user where the worktree is, and commit-change step 1 checks the branch after entering. Both serve R2 and R4.
 
 ## Summary
-The two shared skills now say to load the worktree tools before calling them, to check the folder and branch after entering, and to stop in plain English when entry fails. Checks pass (384 Rust tests, clippy, fmt, lint, Vite build). Two re-review rounds ran; the plan is untouched. The live confirmation is plan test T2 on the next real change.
+The two shared skills now say to load the worktree tools before calling them, to check the folder and branch after entering, and to stop in plain English when entry fails. Checks pass (384 Rust tests, clippy, fmt, lint, Vite build). Two re-review rounds ran; round 2 was not clean, and the user settled its two no-action remarks and ruled out a further round; the plan is untouched. The live confirmation is plan test T2 on the next real change.
