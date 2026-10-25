@@ -11,6 +11,16 @@ Entry format:
 - **Reason:** <why it is this way>
 ```
 
+## The number-claim placeholder file has a random suffix
+- **Change:** PWF-015
+- **Date:** 2026-10-24
+- **Reason:** `/plan-change` claims its change number with `docs/plans/<NUMBER>-claimed-<six random letters>.md`, not a fixed `<NUMBER>-claimed.md`. With one fixed name, two chats claiming the same number at the same moment would silently overwrite each other's file and never notice the clash. With a random suffix both files exist, the one whose name sorts first keeps the number, and the other chat takes the next one.
+
+## /code-change keeps a single-folder fallback next to the worktree flow
+- **Change:** PWF-015
+- **Date:** 2026-10-24
+- **Reason:** A worktree cannot carry the user's own uncommitted edits, and the skills are shared with projects that have no "Worktree folder" line in CLAUDE.md. For those two cases `/code-change` creates the branch in the main folder as it always did, and `/commit-change` has nothing to remove afterwards. This is deliberate, not a leftover to delete.
+
 ## Each skill states its own missing-backup-line fallback
 - **Change:** PWF-007
 - **Date:** 2026-10-24
