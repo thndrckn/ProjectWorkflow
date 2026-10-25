@@ -9,7 +9,10 @@
 // Nothing project-specific lives here: the default branch, change prefix, version files
 // and the first checked change number come from CLAUDE.md (see readConfig). The written
 // rules this implements are the "Review gate" in /commit-change and the policy's peer
-// review section; they stay the specification.
+// review section; they stay the specification. The records are free prose, so the gate reads
+// their labelled lines exactly but the re-review rounds only by keyword (a rejection, "clean",
+// a verdict word such as accepted/resolved); it cannot check item by item that each outcome was
+// accepted. /commit-change reads the record itself as well and stops if the two disagree.
 //
 // Every unexpected problem refuses (exit 2): the lock fails closed.
 
