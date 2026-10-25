@@ -164,13 +164,14 @@ function hasRejection(text) {
 // A round that says in so many words that it was clean cannot be holding a standing rejection:
 // "clean" means every outcome was accepted. So a rejection mentioned in passing (an earlier
 // outcome that was then fixed and accepted) does not fail such a round.
+function saysNotClean(text) {
+  return /not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text);
+}
 function statesCleanRound(text) {
-  if (/not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text)) return false;
-  return /round clean:\s*\**\s*yes\b|\b(?:round|it) (?:was|is) \**clean\b/i.test(text);
+  return !saysNotClean(text) && /round clean:\s*\**\s*yes\b|\b(?:round|it) (?:was|is) \**clean\b/i.test(text);
 }
 function isCleanRound(text) {
-  if (/not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text)) return false;
-  return /\bclean\b/i.test(text);
+  return !saysNotClean(text) && /\bclean\b/i.test(text);
 }
 
 function traceRows(body) {
