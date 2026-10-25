@@ -304,6 +304,17 @@ function checkRange(oldTip, newTip, cfg) {
   return problems;
 }
 
+// Is the lock itself (this checker) part of the given commit? A branch that does not hold it yet
+// is the one the change introducing the lock is merged into: nothing to enforce there, even though
+// git, once the merge has checked its files out, already finds the hook.
+let ownRel = null;
+function lockPresentAt(tip) {
+  if (ownRel === null) {
+    ownRel = path.relative(git(['rev-parse', '--show-toplevel']).trim(), fileURLToPath(import.meta.url)).replace(/\\/g, '/');
+  }
+  return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null;
+}
+
 // The default branch as git itself knows it: where the remote's HEAD points, and init.defaultBranch.
 function gitDefaultBranchHints() {
   const hints = [];
@@ -350,7 +361,7 @@ function hookMode(state) {
       // Without CLAUDE.md's "Default branch" line the branch cannot be recognised that way, so
       // fall back on what git itself says the default branch is, and refuse if this is it.
       const short = ref.slice('refs/heads/'.length);
-      if (gitDefaultBranchHints().includes(short)) {
+      if (lockPresentAt(oldTip) && gitDefaultBranchHints().includes(short)) {
         problemsByBranch.push({
           branch: short,
           problems: ['The lock\'s settings cannot be read: CLAUDE.md is missing, or has no "Default branch" line, at the current tip of this branch.'],
@@ -360,6 +371,7 @@ function hookMode(state) {
     }
     if (ref !== `refs/heads/${defaultName}`) continue; // not the default branch
     const cfg = readConfig(claudeOld);
+    if (!cfg.ok && !lockPresentAt(oldTip)) continue; // the lock is not on this branch yet (see lockPresentAt)
     const problems = [];
     if (!cfg.ok) {
       problems.push(...cfg.problems.map((p) => `The lock's settings are incomplete: ${p}.`));

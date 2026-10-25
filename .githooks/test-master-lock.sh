@@ -316,6 +316,25 @@ g switch -q master
 attempt "a branch with git's unnumbered catch-up merge" refused "Merge branch 'master' into work-b" g merge --no-ff -q work-b -m "feat(ABC-072): merge"
 g merge --abort 2>/dev/null; g reset -q --hard
 
+echo "== the change that introduces the lock is merged without being refused"
+r="$tmp/boot"; def=master; pfx=ABC
+git init -q -b master "$r"
+printf -- '- **Default branch:** `master`\n- **Change prefix:** `ABC`\n' > "$r/CLAUDE.md"
+g add -A
+g commit -q -m "chore(ABC-001): init"
+g switch -q -c lock-intro
+mkdir -p "$r/.githooks"
+cp "$here/master-lock-check.mjs" "$here/reference-transaction" "$here/install-master-lock.sh" "$r/.githooks/"
+chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-master-lock.sh"
+printf -- '- **Version files:** `package.json`.\n- **Master lock starts at:** `ABC-010`\n' >> "$r/CLAUDE.md"
+g add -A
+g update-index --chmod=+x .githooks/reference-transaction .githooks/install-master-lock.sh
+g commit -q -m "chore(ABC-002): add the lock"
+g switch -q master
+g config core.hooksPath .githooks
+attempt "merging the change that adds the lock, once git already finds its hook" ok "" g merge --no-ff -q lock-intro -m "chore(ABC-002): add the lock"
+attempt "an unnumbered commit afterwards" refused "carries no ABC change number" commit_with x none "fix typo"
+
 echo "== R8: the status check"
 new_repo r8
 check "status when the lock is on" 0 "Master lock: ON" status_in
