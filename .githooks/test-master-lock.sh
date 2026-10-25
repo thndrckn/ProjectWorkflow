@@ -83,6 +83,16 @@ Looked at it. Round clean: yes.
 ### Round 1
 The re-reviewer rejected the fix.
 " ;;
+    cleanmention) rereview="## Re-review
+
+### Round 1
+The re-reviewer first rejected the fix; the author reworked it and the re-reviewer then accepted it. Round clean: yes.
+" ;;
+    rejectedunclean) rereview="## Re-review
+
+### Round 1
+The re-reviewer rejected the fix. Round clean: no.
+" ;;
     unclean) rereview="## Re-review
 
 ### Round 1
@@ -191,6 +201,8 @@ attempt "missing caused label" refused 'no "Caused by this change' commit_with A
 attempt "caused finding logged" refused "logged instead of fixed or explained" commit_with ABC-031 logged "feat(ABC-031): x"
 attempt "findings but no re-review" refused "no re-review round is recorded" commit_with ABC-032 norereview "feat(ABC-032): x"
 attempt "re-reviewer rejection left standing" refused "records a rejection" commit_with ABC-033 rejected "feat(ABC-033): x"
+attempt "a clean last round that mentions an earlier rejection that was then accepted" ok "" commit_with ABC-042 cleanmention "feat(ABC-042): x"
+attempt "a rejection in a last round that is not clean" refused "records a rejection" commit_with ABC-043 rejectedunclean "feat(ABC-043): x"
 attempt "last round not clean" refused "did not finish" commit_with ABC-034 unclean "feat(ABC-034): x"
 attempt "fourth round not authorised" refused "beyond the third" commit_with ABC-035 round4 "feat(ABC-035): x"
 attempt "failed requirement" refused "failed its test" commit_with ABC-036 failrow "feat(ABC-036): x"

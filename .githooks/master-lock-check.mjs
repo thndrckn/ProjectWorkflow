@@ -161,6 +161,13 @@ function hasRejection(text) {
     .replace(/\brejected\s+(?:nothing|none)\b/gi, '');
   return /\b(?:rejected|rejects|rejection|did not accept|does not accept|not accepted)\b/i.test(t);
 }
+// A round that says in so many words that it was clean cannot be holding a standing rejection:
+// "clean" means every outcome was accepted. So a rejection mentioned in passing (an earlier
+// outcome that was then fixed and accepted) does not fail such a round.
+function statesCleanRound(text) {
+  if (/not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text)) return false;
+  return /round clean:\s*\**\s*yes\b|\b(?:round|it) (?:was|is) \**clean\b/i.test(text);
+}
 function isCleanRound(text) {
   if (/not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text)) return false;
   return /\bclean\b/i.test(text);
@@ -201,7 +208,7 @@ function evaluateRecord(raw) {
   if (rounds.length > 0) {
     const last = rounds[rounds.length - 1];
     const lastSettled = /Settled by the user:/.test(last.text);
-    if (hasRejection(last.text) && !lastSettled) {
+    if (hasRejection(last.text) && !lastSettled && !statesCleanRound(last.text)) {
       failures.push(`The last re-review round (round ${last.n}) records a rejection that no later round resolves.`);
     }
     if (!isCleanRound(last.text) && !lastSettled) {
