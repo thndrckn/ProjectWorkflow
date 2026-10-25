@@ -1,0 +1,16 @@
+#!/bin/sh
+# Git hook, run on every ref update. It hands the update to the master lock checker,
+# which refuses any update of the default branch that is not a proper check-in.
+# Only the "prepared" state can refuse, and updates that touch no local branch (tags,
+# remote-tracking refs from a fetch) are waved through without starting node.
+# See CLAUDE.md, "Master lock".
+if [ "$1" != "prepared" ]; then
+  cat >/dev/null
+  exit 0
+fi
+input=$(cat)
+case "$input" in
+  *" refs/heads/"*) ;;
+  *) exit 0 ;;
+esac
+printf '%s\n' "$input" | node "$(dirname "$0")/master-lock-check.mjs" hook prepared
