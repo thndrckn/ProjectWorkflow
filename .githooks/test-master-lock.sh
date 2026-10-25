@@ -335,6 +335,14 @@ g config core.hooksPath .githooks
 attempt "merging the change that adds the lock, once git already finds its hook" ok "" g merge --no-ff -q lock-intro -m "chore(ABC-002): add the lock"
 attempt "an unnumbered commit afterwards" refused "carries no ABC change number" commit_with x none "fix typo"
 
+echo "== settings complete but the lock's own files absent at the tip: still enforced"
+new_repo r17
+cp -r "$r/.githooks" "$tmp/r17-hooks"
+g config core.hooksPath "$(cd "$tmp/r17-hooks" && pwd -W 2>/dev/null || pwd)"
+g rm -r -q .githooks
+attempt "moving the hook files out of the repository (a number below the start)" ok "" g commit -q -m "chore(ABC-005): move the hook files out of the repository"
+attempt "an unnumbered commit afterwards is still refused" refused "carries no ABC change number" commit_with x none "fix typo"
+
 echo "== R8: the status check"
 new_repo r8
 check "status when the lock is on" 0 "Master lock: ON" status_in
