@@ -4,7 +4,7 @@
 - **Review format:** accountability
 - **Plan:** docs/plans/PWF-017-master-lock.md (approved in commit ee13568)
 - **Branch:** chore/PWF-017-master-lock
-- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then three rounds of fresh re-reviewers (rounds 1 to 3)
+- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then six rounds of fresh re-reviewers (rounds 1 to 3, and extra rounds 4 to 6 the user authorised)
 - **Scope:** diff of chore/PWF-017-master-lock against master — 12 files, about 1,040 lines added and 3 removed (the new `.githooks/` folder with the checker, hook wrapper, setup script and test script; `.gitattributes`; the guard checker and its tests; the commit-change and build-changes skills; CLAUDE.md; CHANGELOG.md; the plan). `docs/DECISIONS.md` and this record were added afterwards.
 
 ## Findings
@@ -44,6 +44,7 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 - **[Low]** The plan's bootstrap exception (an old tip with no lock line passes) is not built, and the settings-missing tests refuse instead — `.githooks/master-lock-check.mjs`
   **Caused by this change:** yes
   **Disposition:** explained (the exception contradicts the plan's own R10 test, and it is not needed: git only finds the hook after this change is merged; recorded under Deviations)
+  **Correction (round 4):** this explanation was wrong, and rounds 1 to 3 accepted it. A merge checks the merged files, `.githooks` included, out before it updates the branch, so a user who has already switched the lock on has git run the new hook during the very merge that introduces it, with the old tip still lacking the lock's settings; the lock refused that merge. Disposition is now **fixed**: the exception is built, narrowed to "the old tip's settings are incomplete AND the old tip does not hold the lock's files" (so a missing setting where the files are present still refuses, keeping R10); tests added; round 4 accepted it.
 - **[Informational]** Extras beyond the plan: a CLAUDE.md note on recovering from a refused merge, and the skills skip the status check when CLAUDE.md has no Master lock line — `CLAUDE.md`, `.claude/skills/commit-change/SKILL.md`, `.claude/skills/build-changes/SKILL.md`
   **Caused by this change:** yes
   **Disposition:** explained (a project without the lock line needs the skip; the plan's "stop if off" applies where the project has the line)
@@ -96,6 +97,24 @@ Every finding is listed, with the severity and caused label the reviewer assigne
   **Caused by this change:** yes
   **Disposition:** explained (the comment says "such as", so the list is illustrative and accurate)
 
+### Round 4 (extra)
+
+- **[Medium]** The merge that introduces the lock was refused by the lock itself when the lock was already switched on, because git finds the new hook while the merge checks its files out; the message wrongly said the settings were incomplete. Found by the author in a run against a clone of the real project history, after rounds 1 to 3 had accepted the explanation of the matching Spec finding; rated by the round 4 reviewer — `.githooks/master-lock-check.mjs`
+  **Caused by this change:** yes
+  **Disposition:** fixed (the checker waves an update through when the old tip's settings are incomplete and the old tip does not hold the lock's files; a test of the merge that adds the lock, and one of an unnumbered commit refused afterwards, were added; the real-history run now merges and then refuses and allows as expected)
+- **[Nit]** `lockPresentAt` tests only whether the checker exists at its current path in the old tip, so a moved checker would look lock-free — `.githooks/master-lock-check.mjs`
+  **Caused by this change:** yes
+  **Disposition:** explained (moving the checker is a deliberate change to the hook folder, made through a planned and reviewed change; complete settings are still enforced whatever the files, and a check-in cannot make the settings incomplete or loosen them)
+- **[Informational]** No test pinned "complete settings but the lock's files absent at the old tip, still enforced" — `.githooks/test-master-lock.sh`
+  **Caused by this change:** yes
+  **Disposition:** fixed (a test was added: the hook files run from outside the repository, are removed from it, and an unnumbered commit is still refused)
+
+### Round 5
+
+- **[Nit]** The new test cannot tell the file-presence check from the settings rule, so its name overstated what it pins — `.githooks/test-master-lock.sh`
+  **Caused by this change:** yes
+  **Disposition:** fixed (the section title and case name now say it pins the settings rule, and a comment says the file check is covered by the bootstrap test)
+
 ## Re-review
 
 ### Round 1
@@ -106,6 +125,20 @@ A new fresh re-reviewer checked the three Round 1 outcomes (the keyword-limit co
 
 ### Round 3
 A third fresh re-reviewer checked the two Round 2 outcomes: it accepted the wording fix and the explanation that "such as" makes the keyword list illustrative. It raised no new finding. Round clean: yes.
+
+After round 3 the author ran the lock against a clone of the real project history and found the defect listed under "Round 4 (extra)" above, which rounds 1 to 3 had missed. The review was at its three-round limit, so the author stopped and asked the user.
+
+### Round 4 (extra)
+**Settled by the user:** "Authorise round 4 (Recommended)", the answer to the question asked after round 3 about checking the bootstrap fix.
+A fresh re-reviewer rated the defect Medium (caused: yes), accepted the bootstrap fix (it waves an update through only when the old tip's settings are incomplete and the lock's files are absent; a check-in cannot make the settings incomplete or loosen them, and deleting the checker leaves the settings complete, so no unchecked commit gets through), accepted the corrected P4 entry as a deviation that tightens the plan, and accepted the guard-test edit. It raised two new items, listed above under Round 4 (extra). The round was **not clean** (new findings).
+
+### Round 5
+**Settled by the user:** "Add the pinning test, authorise round 5", the answer to the question asked after round 4.
+A fresh re-reviewer accepted the explanation of the moved-checker Nit and the added pinning test. It raised one new Nit (the test name overstated what it pins), listed above under Round 5. The round was **not clean** (new finding).
+
+### Round 6
+**Settled by the user:** "Reword the test, authorise round 6", the answer to the question asked after round 5.
+A last fresh re-reviewer checked the wording fix against the checker and accepted it, and raised no new finding. Round clean: yes.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -119,7 +152,7 @@ A third fresh re-reviewer checked the two Round 2 outcomes: it accepted the word
 | R7 | Automated: a failing-record commit, an unnumbered commit, merging the default branch into a work branch with git's own message, and creating and deleting branches all succeed on a work branch | Pass |
 | R8 | Automated for the status check (on, hooksPath unset, wrong folder, hook file not executable, missing, settings incomplete, the setup script switching it on and being safe to run again): Pass. The skills' stop wording is read in the next real change's /commit-change and /build-changes (T4) | Manual |
 | R9 | A live /commit-change and /build-changes on the next real change (T4). Claude ran the gate on every existing new-format record and confirmed all pass | Manual |
-| R10 | Automated: settings missing the prefix, the starting number or the version files, a malformed starting number, an unreadable record, no CLAUDE.md at all, a change stripping the settings, raising or widening them, deleting the default branch, and a garbled line each refuse; lowering the number and narrowing the files pass | Pass |
+| R10 | Automated: settings missing the prefix, the starting number or the version files, a malformed starting number, an unreadable record, no CLAUDE.md at all, a change stripping the settings, raising or widening them, deleting the default branch, and a garbled line each refuse; lowering the number and narrowing the files pass; the merge that introduces the lock passes once git already finds its hook, and complete settings are still enforced when the lock's files are absent. Claude also merged the branch into a clone of the real project history and tried an unnumbered commit, a PWF-018 commit with no record, a release commit and a release commit that also edits CLAUDE.md | Pass |
 | R11 | Automated: a throwaway repo with another prefix, default branch name and starting number, where the lock follows CLAUDE.md; plus grep checks that the lock's files name none of this project's names or fixed branch names | Pass |
 | R12 | Automated: a fetch that moves a remote-tracking branch to an unrecorded commit, a tag created and moved, a hand-set remote-tracking ref and another branch all succeed; the default branch set to the same unrecorded commit, and a pull of it into the default branch, are refused | Pass |
 | R13 | Read CLAUDE.md: the "Master lock — turning it off by hand (for the user only)" section names the off and on steps, marks them for the user only, and tells Claude never to run them or set core.hooksPath | Pass (checked by Claude) |
@@ -128,7 +161,7 @@ A third fresh re-reviewer checked the two Round 2 outcomes: it accepted the word
 ## Deviations from the plan
 - The checker is `.githooks/master-lock-check.mjs`, not `.js`, so node reads it as a module in any folder the lock is copied into, including the throwaway test repos.
 - A `.gitattributes` file was added so the hook scripts keep LF line endings on a Windows checkout (the project sets `core.autocrlf`); the plan did not list it.
-- The plan's bootstrap exception (an old tip with no lock line passes) is not built, because it contradicts the plan's own R10 test (a CLAUDE.md missing the lock line refuses). It is not needed: git only finds the hook once this change is merged, so this change's own merge is unguarded either way.
+- The plan's bootstrap exception (an old tip with no lock line passes) is built in a narrower form: it applies only when the old tip's settings are incomplete AND the old tip does not hold the lock's own files. The plain wording would contradict the plan's own R10 test (a CLAUDE.md missing the lock line refuses where the lock is present). The first version of this change left the exception out as "not needed"; that was wrong, because git finds the hook while the merge that introduces the lock checks its files out. Found and fixed in round 4 (see the Correction under the Spec finding). Either way, the merge of this change is not checked against its own records.
 - Deleting the default branch is refused (the plan passed deletions through), because delete-and-recreate would otherwise be a way round the lock.
 - When git passes an all-zero old value (a bare `update-ref`), the checker looks up the branch's current tip instead of treating the update as a branch creation.
 - A check-in cannot loosen or change the lock's own settings in CLAUDE.md (raise the starting number, add version files, change the prefix or default branch); the plan only said the settings are read from the old tip.
@@ -140,4 +173,4 @@ A third fresh re-reviewer checked the two Round 2 outcomes: it accepted the word
 - No migration is needed.
 
 ## Summary
-The master lock is built: a `reference-transaction` hook and one shared checker (`hook`, `gate` and `status` modes) that refuse any update of the default branch that carries an unnumbered commit, a change from PWF-016 on without a passing review record, or a release-worded commit that touches more than the version files and changelog; only the local default branch is guarded, and the lock fails closed. `/commit-change` now runs the same gate, numbers its catch-up merge and checks the lock is on; `/build-changes` checks it too; CLAUDE.md names the setup, the starting number and the user-only turn-off steps; and the guard blocks Claude from touching `core.hooksPath`. The first review found 18 items; the author fixed the real problems (settings could be loosened by a check-in, a missing CLAUDE.md did not refuse, fragile record parsing) and explained the rest, which re-reviewers accepted. Three re-review rounds ran, the third clean. The lock's test script passes in full (86 cases) and all required checks pass.
+The master lock is built: a `reference-transaction` hook and one shared checker (`hook`, `gate` and `status` modes) that refuse any update of the default branch that carries an unnumbered commit, a change from PWF-016 on without a passing review record, or a release-worded commit that touches more than the version files and changelog; only the local default branch is guarded, and the lock fails closed. `/commit-change` now runs the same gate, numbers its catch-up merge and checks the lock is on; `/build-changes` checks it too; CLAUDE.md names the setup, the starting number and the user-only turn-off steps; and the guard blocks Claude from touching `core.hooksPath`. The first review found 18 items; the author fixed the real problems (settings could be loosened by a check-in, a missing CLAUDE.md did not refuse, fragile record parsing) and explained the rest, which re-reviewers accepted. Three re-review rounds ran, the third clean. A run against a clone of the real project history then found a defect all three rounds had missed: the lock would have refused the merge that introduces it, because git finds the hook while that merge checks its files out; the earlier "not needed" explanation of the bootstrap exception was wrong and is corrected above. With the user's authorisation three extra rounds (4 to 6) checked the fix, a pinning test and its wording; round 6 was clean. The lock's test script passes in full (91 cases), all required checks pass, and the plan is untouched. The guard's own test script (`test-block-main-edits.sh`) ran in full once, before the last two edits to it: 697 passed and 2 failed, the 2 being a wrong expectation in a case I had added (two-word `git config` on master was already blocked by an older rule); that case was moved to the worktree-only checks and the script was not run in full again (it takes about an hour), so those last lines are covered by the run's other results, not by a second full run.
