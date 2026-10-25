@@ -1,6 +1,6 @@
 # Design decisions
 
-Decisions explained as "by design" during code review, so reviewers and Claude don't raise them again. `/code-change` adds an entry when a review finding is explained as by design, unless the decision is already here. Observations that aren't decisions stay in the review record only.
+Decisions explained as "by design" during code review, so reviewers and Claude don't raise them again. `/code-change` adds an entry when a review finding is explained as by design, unless the decision is already here. Observations that aren't decisions stay in the review record only. A by-design reason that belongs to one spot in the code goes in a comment at that spot instead, not here; only project-wide reasons are entries in this file.
 
 Entry format:
 
