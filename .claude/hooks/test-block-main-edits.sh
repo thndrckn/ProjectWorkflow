@@ -199,6 +199,23 @@ for c in 'git worktree remove --force x' 'git worktree remove -f x' 'git worktre
   blocked "$c"
 done
 
+echo "== R10: the master lock's switch (core.hooksPath) is the user's alone, on master and from a worktree"
+for c in 'git config core.hooksPath ""' 'git config core.hooksPath /nonexistent' 'git config --unset core.hooksPath' \
+  'git config --unset-all core.hooksPath' 'git config --local core.hooksPath x' 'git config set core.hooksPath x' \
+  'git config unset core.hooksPath' 'git config CORE.HOOKSPATH x' 'git config --global core.hooksPath x' \
+  'git -c core.hooksPath=/dev/null merge x' 'git -ccore.hooksPath=/x merge x' 'git -c core.hookspath=/x merge x' \
+  'git --config-env=core.hooksPath=VAR merge x' \
+  'GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/x git merge x' \
+  'GIT_CONFIG_PARAMETERS="core.hookspath=/x" git merge x' 'export GIT_CONFIG_COUNT=1' \
+  "\$env:GIT_CONFIG_COUNT='1'" 'GIT_CONFIG_GLOBAL=/x git merge y'; do
+  blocked "$c"
+  bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
+done
+for c in 'git config --get core.hooksPath' 'git config get core.hooksPath' 'git config core.hooksPath' 'git config --list'; do
+  allowed "$c"
+  bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
+done
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]

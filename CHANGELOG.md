@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-017 (chore) Added the master lock: a git hook that refuses any update of master that is not a proper check-in (every change from PWF-016 on needs a review record that passes the commit-change gate; release commits may touch only the version files and the changelog), however the commit arrives. One shared checker serves the hook and /commit-change, which now also numbers its catch-up merge; /commit-change and /build-changes stop if the lock is off, and the guard hook stops Claude from switching it off.
 - PWF-015 (chore) Each change is now coded in its own worktree, so several can be coded at once in separate chats: /plan-change claims change and migration numbers at once, /code-change works in a worktree with its own empty database and dev-server port, /commit-change merges from it, resolves a changelog-only clash and removes it, /build-changes builds what is merged while others are open, and the guard hook protects master from every folder.
 - PWF-014 (chore) When "Plan it now" sets aside your original /plan-change request, the plan now records it word for word, and /commit-change's final report ends with it as a ready-to-paste /plan-change command.
 - PWF-013 (chore) The inert plan-renaming script, its after-plan-mode hook entry and the plan-folder setting are removed from the project settings; plan mode stays blocked. The matching backlog entry is removed.
