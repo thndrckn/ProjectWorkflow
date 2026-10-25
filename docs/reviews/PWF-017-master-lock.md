@@ -4,7 +4,7 @@
 - **Review format:** accountability
 - **Plan:** docs/plans/PWF-017-master-lock.md (approved in commit ee13568)
 - **Branch:** chore/PWF-017-master-lock
-- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then six rounds of fresh re-reviewers (rounds 1 to 3, and extra rounds 4 to 6 the user authorised)
+- **Reviewer:** three independent reviewers (Standards, Spec, Correctness), then eight rounds of fresh re-reviewers (rounds 1 to 3, and extra rounds 4 to 8 the user authorised)
 - **Scope:** diff of chore/PWF-017-master-lock against master — 12 files, about 1,040 lines added and 3 removed (the new `.githooks/` folder with the checker, hook wrapper, setup script and test script; `.gitattributes`; the guard checker and its tests; the commit-change and build-changes skills; CLAUDE.md; CHANGELOG.md; the plan). `docs/DECISIONS.md` and this record were added afterwards.
 
 ## Findings
@@ -66,6 +66,7 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 - **[Low]** The gate's parsing is fragile: a blank line inside a finding ended its block, findings without the severity form were not counted, and a clean last round that mentions an earlier rejection is refused — `.githooks/master-lock-check.mjs`
   **Caused by this change:** yes
   **Disposition:** fixed in part, explained for the rest (blocks now run over blank lines followed by indented text, and any bullet carrying the Caused-by or Disposition labels counts as a finding, so one with no severity is refused; two tests added. The refused clean round fails safe: /commit-change stops when its own reading disagrees, and a recorded "Settled by the user:" line settles it; recorded in docs/DECISIONS.md)
+  **Correction (round 7):** at the user's request the refused clean last round is now fixed too. Disposition is now **fixed**: a last round that says in so many words that it was clean ("Round clean: yes", "the round was clean") is no longer failed for a rejection mentioned in passing, since "clean" means every outcome was accepted; a rejection in a last round that is not stated clean, or is marked "Round clean: no", still fails; two tests added; round 7 accepted it.
 - **[Informational]** Moving the default branch back to an ancestor (`git reset --hard HEAD~1`) adds no commits and is allowed — `.githooks/master-lock-check.mjs`
   **Caused by this change:** yes
   **Disposition:** explained (no commit reaches the branch that way)
@@ -115,6 +116,21 @@ Every finding is listed, with the severity and caused label the reviewer assigne
   **Caused by this change:** yes
   **Disposition:** fixed (the section title and case name now say it pins the settings rule, and a comment says the file check is covered by the bootstrap test)
 
+### Round 7
+
+- **[Informational]** While the main folder is on master, a shell write into another worktree's folder is allowed when the path is absolute and blocked when written relatively; `cp` and `Copy-Item` behave alike. Raised by the author (its earlier claim that `Copy-Item` was a gap in the guard was mistaken: an absolute `cp` also passes, by the guard's design that a worktree is judged by its own branch); rated by a separate fresh reviewer, who found it intended best-effort behaviour that fails closed — `.claude/hooks/shell-command-check.js`, `.claude/hooks/block-main-edits.sh`
+  **Caused by this change:** no
+  **Disposition:** logged in docs/BACKLOG.md (at the user's direction; the round 7 reviewer confirmed the "no" label: the change's diff to the guard only adds the `core.hooksPath` and `GIT_CONFIG_*` rules and does not touch path handling)
+- **[Nit]** The "not clean" wording check was written out twice in the checker (in `statesCleanRound` and in `isCleanRound`), so the two could drift apart — `.githooks/master-lock-check.mjs`
+  **Caused by this change:** yes
+  **Disposition:** fixed (both now call one helper, `saysNotClean`; behaviour unchanged; round 8 accepted it)
+
+### Round 8
+
+- **[Nit]** Moving the check into the helper left the comment that explains `statesCleanRound` above the helper instead — `.githooks/master-lock-check.mjs`
+  **Caused by this change:** yes
+  **Disposition:** fixed (the comment is back above `statesCleanRound`; the lock's tests re-run, 93 passed). **Settled by the user:** "Fix it, no further review, settled by you (Recommended)" — this comment-only edit was not re-reviewed, on the user's instruction.
+
 ## Re-review
 
 ### Round 1
@@ -140,12 +156,22 @@ A fresh re-reviewer accepted the explanation of the moved-checker Nit and the ad
 **Settled by the user:** "Reword the test, authorise round 6", the answer to the question asked after round 5.
 A last fresh re-reviewer checked the wording fix against the checker and accepted it, and raised no new finding. Round clean: yes.
 
+After round 6 the user asked for three things before check-in: re-run the full guard test script (a failed test is not closed until it passes on a re-run), fix the false refusal of a clean last round that mentions an old rejection (caused by this change, with a test), and log the guard observation in the backlog as not caused, then re-review.
+
+### Round 7
+**Settled by the user:** "Then re-review.", the user's instruction after the hand-off, covering the fix, the backlog entry and the corrected record.
+A fresh re-reviewer accepted the clean-round fix (it only skips the last-round rejection failure when the round says in so many words that it was clean; a rejection in a round not stated clean, or marked "Round clean: no", still fails; two tests pin both), accepted the logging of the guard observation and confirmed its "caused: no" label against the unchanged path handling, and had no objection to the corrected deviation. It raised one new Nit (the duplicated wording check), listed above under Round 7. The round was **not clean** (new finding).
+
+### Round 8
+**Settled by the user:** "Dedupe it, authorise round 8 (Recommended)", the answer to the question asked after round 7.
+A fresh re-reviewer accepted the dedupe (the regex is character-identical, the behaviour of the three functions is unchanged). It raised one new Nit (a displaced comment), listed above under Round 8. The round was **not clean** (new finding). The author stopped and asked the user, who settled it: **Settled by the user:** "Fix it, no further review, settled by you (Recommended)".
+
 ## Requirements trace
 | Requirement | Test | Result |
 |---|---|---|
 | R1 | Automated: the lock's test script — merge with no-ff, fast-forward, cherry-pick, plain commit, `--no-verify` commit, a change with no findings, all allowed with passing records; `--no-verify`, fast-forward and merge of a failing change refused | Pass |
 | R2 | Automated: a change at and above the starting number with no record is refused, naming the change | Pass |
-| R3 | Automated: seven fixtures that each break one gate rule are refused with the rule in the message; a settled-by-the-user fixture, a clean record and a blank-line-in-finding record pass; a missing-verdict round and a finding without a severity form are refused; plus the gate run on every existing new-format record (PWF-009 to PWF-015), all passing | Pass |
+| R3 | Automated: seven fixtures that each break one gate rule are refused with the rule in the message; a settled-by-the-user fixture, a clean record, a blank-line-in-finding record and a clean last round that mentions an earlier accepted rejection pass; a rejection in a last round marked not clean is refused; a missing-verdict round and a finding without a severity form are refused; plus the gate run on every existing new-format record (PWF-009 to PWF-015), all passing | Pass |
 | R4 | Automated: an unnumbered commit, a number with too few digits, another prefix's number and a number outside the scope brackets are refused | Pass |
 | R5 | Automated: a release commit touching only the version files and changelog passes, a build branch merged with the release message passes; one that also changes another file and one with the wrong message form are refused | Pass |
 | R6 | Automated: a number below the starting number with no record passes; an old-format record above it passes | Pass |
@@ -168,9 +194,9 @@ A last fresh re-reviewer checked the wording fix against the checker and accepte
 - When CLAUDE.md or its "Default branch" line cannot be read at the current tip, the hook falls back on origin/HEAD and init.defaultBranch to recognise the default branch, so a missing CLAUDE.md refuses (planned R10 test).
 - Every re-review round must state the re-reviewer's verdict; the plan described only the last-round checks.
 - The guard (`.claude/hooks/shell-command-check.js`) now blocks `git -c core.hooksPath`, `git config` writes naming `core.hooksPath` and the `GIT_CONFIG_*` environment settings in every mode, with a new test section; the plan said to extend it only if not already covered, and it was not.
-- The Windows `Copy-Item` in PowerShell was not stopped by the master guard when the plan was copied into the worktree (a bare `cp` was); the guard is best-effort pattern matching, as its header says. Not changed here.
+- The guard let the plan be copied into the worktree with `Copy-Item` and absolute paths while a relative `cp` was blocked. The first version of this record called that a gap in the guard; that was mistaken. An absolute path into another worktree is judged by that worktree's own branch (the guard's design, and an absolute `cp` passes too), while a relative path cannot be resolved and is blocked. Logged in `docs/BACKLOG.md` as an Informational observation, not caused by this change, at the user's direction.
 - `docs/DECISIONS.md` gained two entries (the lock covers updates through the main folder only; the lock reads review-record rounds only by keyword).
 - No migration is needed.
 
 ## Summary
-The master lock is built: a `reference-transaction` hook and one shared checker (`hook`, `gate` and `status` modes) that refuse any update of the default branch that carries an unnumbered commit, a change from PWF-016 on without a passing review record, or a release-worded commit that touches more than the version files and changelog; only the local default branch is guarded, and the lock fails closed. `/commit-change` now runs the same gate, numbers its catch-up merge and checks the lock is on; `/build-changes` checks it too; CLAUDE.md names the setup, the starting number and the user-only turn-off steps; and the guard blocks Claude from touching `core.hooksPath`. The first review found 18 items; the author fixed the real problems (settings could be loosened by a check-in, a missing CLAUDE.md did not refuse, fragile record parsing) and explained the rest, which re-reviewers accepted. Three re-review rounds ran, the third clean. A run against a clone of the real project history then found a defect all three rounds had missed: the lock would have refused the merge that introduces it, because git finds the hook while that merge checks its files out; the earlier "not needed" explanation of the bootstrap exception was wrong and is corrected above. With the user's authorisation three extra rounds (4 to 6) checked the fix, a pinning test and its wording; round 6 was clean. The lock's test script passes in full (91 cases), all required checks pass, and the plan is untouched. The guard's own test script (`test-block-main-edits.sh`) ran in full once, before the last two edits to it: 697 passed and 2 failed, the 2 being a wrong expectation in a case I had added (two-word `git config` on master was already blocked by an older rule); that case was moved to the worktree-only checks and the script was not run in full again (it takes about an hour), so those last lines are covered by the run's other results, not by a second full run.
+The master lock is built: a `reference-transaction` hook and one shared checker (`hook`, `gate` and `status` modes) that refuse any update of the default branch that carries an unnumbered commit, a change from PWF-016 on without a passing review record, or a release-worded commit that touches more than the version files and changelog; only the local default branch is guarded, and the lock fails closed. `/commit-change` now runs the same gate, numbers its catch-up merge and checks the lock is on; `/build-changes` checks it too; CLAUDE.md names the setup, the starting number and the user-only turn-off steps; and the guard blocks Claude from touching `core.hooksPath`. The first review found 18 items; the author fixed the real problems (settings could be loosened by a check-in, a missing CLAUDE.md did not refuse, fragile record parsing) and explained the rest, which re-reviewers accepted. Three re-review rounds ran, the third clean. A run against a clone of the real project history then found a defect all three rounds had missed: the lock would have refused the merge that introduces it, because git finds the hook while that merge checks its files out; the earlier "not needed" explanation of the bootstrap exception was wrong and is corrected above. With the user's authorisation three extra rounds (4 to 6) checked the fix, a pinning test and its wording; round 6 was clean. At the user's request the refused clean last round was then fixed, a guard observation was logged in the backlog as not caused, and rounds 7 and 8 checked them; each raised a Nit, the last settled by the user without a further round. The lock's test script passes in full, all required checks pass, and the plan is untouched. The guard's own test script (`test-block-main-edits.sh`) first ran in full with 697 passed and 2 failed, the 2 being a wrong expectation in a case I had added (two-word `git config` on master was already blocked by an older rule); that case was moved to the worktree-only checks, and at the user's request the whole script was run again in full: 697 passed, 0 failed, so the failed test is closed by a passing re-run. After rounds 7 and 8 the lock's test script has 93 cases, all passing.
