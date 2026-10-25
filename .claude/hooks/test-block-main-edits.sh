@@ -13,6 +13,10 @@ mk_repo() {
   git -C "$1" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 }
 master="$tmp/master-repo"; mk_repo "$master"
+# Like the real project, git ignores .claude/*, which is where its worktrees live.
+printf '.claude/*\n' > "$master/.gitignore"
+git -C "$master" add .gitignore
+git -C "$master" -c user.name=t -c user.email=t@t commit -q -m ignore
 feature="$tmp/feature-repo"; mk_repo "$feature"; git -C "$feature" switch -q -c chore/ABC-000-x
 norepo="$tmp/not-a-repo"; mkdir "$norepo"
 other="$tmp/elsewhere"; mkdir "$other"
@@ -104,6 +108,95 @@ for t in Edit Write MultiEdit; do
   check "master allows $t on a plan file" 0 "$master" "$t" "$master/docs/plans/ABC-001-x.md"
   check "master blocks $t climbing out of plans" 2 "$master" "$t" "$master/docs/plans/../src/x.ts"
   check "feature allows $t on a project file" 0 "$feature" "$t" "$feature/src/x.ts"
+done
+
+# The hook input carries cwd; these cases run from inside a worktree of the master repo.
+# checkc <name> <expected exit> <project dir> <cwd> <tool> <command-or-file_path>
+checkc() {
+  local name=$1 want=$2 repo=$3 cwd=$4 tool=$5 arg=$6 json code
+  # Git Bash would rewrite a path inside VAR=/path arguments for node; keep the text as typed.
+  case "$tool" in
+    Bash|PowerShell) json=$(MSYS2_ARG_CONV_EXCL="*" node -e 'console.log(JSON.stringify({tool_name:process.argv[1],cwd:process.argv[3],tool_input:{command:process.argv[2]}}))' "$tool" "$arg" "$cwd") ;;
+    *) json=$(MSYS2_ARG_CONV_EXCL="*" node -e 'console.log(JSON.stringify({tool_name:process.argv[1],cwd:process.argv[3],tool_input:{file_path:process.argv[2]}}))' "$tool" "$arg" "$cwd") ;;
+  esac
+  printf '%s' "$json" | CLAUDE_PROJECT_DIR="$repo" bash "$hook" >/dev/null 2>&1
+  code=$?
+  if [ "$code" = "$want" ]; then pass=$((pass+1)); echo "PASS  $name"
+  else fail=$((fail+1)); echo "FAIL  $name (wanted $want, got $code)  [$tool] $arg"; fi
+}
+bothc() { checkc "$1 [Bash]" "$2" "$3" "$4" Bash "$5"; checkc "$1 [PowerShell]" "$2" "$3" "$4" PowerShell "$5"; }
+
+wt="$master/.claude/worktrees/ABC-001"
+git -C "$master" worktree add -q "$wt" -b chore/ABC-001-w
+# A worktree kept somewhere else inside the main folder is just as free: the hook asks git
+# where the worktrees are rather than assuming a folder.
+wt2="$master/elsewhere-wt"
+git -C "$master" worktree add -q "$wt2" -b chore/ABC-004-w
+
+echo "== R8: a worktree on a change branch is not blocked, and master's folder stays protected from it"
+for t in Edit Write MultiEdit; do
+  checkc "worktree allows $t on its own file" 0 "$master" "$wt" "$t" "$wt/src/x.ts"
+  checkc "worktree session blocks $t on master's file" 2 "$master" "$wt" "$t" "$master/src/x.ts"
+  checkc "worktree session blocks $t climbing into master's folder" 2 "$master" "$wt" "$t" "$wt/../../../src/x.ts"
+done
+for c in 'git commit -m x' 'git add .' 'git reset --hard' 'echo hi > f.txt' 'rm f' 'sed -i s/a/b/ f' \
+  "echo hi > $wt/src/x.txt" "git -C $wt commit -m x" 'cargo test' "cp a $other/b"; do
+  bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
+done
+for c in "echo hi > $master/src/x.txt" "cp a $master/src/b" "rm -rf $master/src" 'echo hi > ../../../x.txt' \
+  "git -C $master commit -m x" "git --git-dir=$master/.git commit -m x" "git -C $master add ."; do
+  bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
+done
+bothc "worktree session still reads master" 0 "$master" "$wt" "git -C $master status"
+
+echo "== R8b: ways round the main-folder protection from a worktree"
+for c in "GIT_DIR=$master/.git git reset --hard" "GIT_WORK_TREE=$master git reset --hard" \
+  "export GIT_DIR=$master/.git" "\$env:GIT_DIR='$master/.git'" 'GIT_DIR=$X git reset --hard' \
+  "git -c core.worktree=$master reset --hard" 'git branch -f master HEAD' 'git branch -M main' 'git branch -D master' \
+  'git update-ref refs/heads/master HEAD' 'git worktree remove --force x' 'git worktree remove --forc x' \
+  'git push origin HEAD:master' 'git push origin master' 'git push origin +HEAD:main' 'git push --mirror' \
+  "cd $master && sed -i s/a/b/ README.md" "pushd $master; touch a" "Set-Location $master" "cd '$master'" \
+  'cd ..' 'cd ../../..' 'cd $HOME2' "git -C $master/src reset --hard" 'git -C .. commit -m x' \
+  "git -C$master reset --hard" "git -ccore.worktree=$master reset --hard" \
+  'git --config-env=core.worktree=X reset --hard' "git --namespace foo -C $master reset --hard" \
+  'git --namespace foo update-ref -d refs/heads/master' 'git --unknown-flag commit -m x' \
+  'git fetch -u . HEAD:master' 'git fetch --update-head-ok . HEAD:main' \
+  "git config core.worktree $master" 'git config --local core.bare true' \
+  "git config set core.worktree $master" 'git config set --worktree core.bare true' \
+  "git config --file $master/.git/config core.worktree X" 'git config -f x core.worktree y' \
+  'git config --type path core.worktree X' "git config -f $master/.git/config user.name x" \
+  "git config --file=$master/.git/config user.name x" "git config -f$master/.git/config user.name x" \
+  'git config -fx core.worktree y'; do
+  bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
+done
+for c in 'git push -u origin chore/ABC-001-w' 'git push' 'git branch -d other' 'git branch --show-current' \
+  'git worktree list' "cd $wt/src && touch x" 'cd src' 'cd -' "git -C $wt log" "GIT_DIR=$wt/.git git status" \
+  "echo hi > $wt2/x.txt" "git -C $wt2 commit -m x" 'git --no-pager log' 'git -c user.name=x commit -m x' \
+  'git -cuser.name=x commit -m x' 'git fetch origin' 'git fetch origin master' 'git config user.name x' \
+  'git config core.worktree' 'git --namespace foo status' 'git config set user.name x' \
+  'git config -f .gitmodules user.name x' 'git config --type bool user.thing true' \
+  "git config --file $wt/.git user.name x" 'git config -f.gitmodules user.name x'; do
+  bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
+done
+for t in Edit Write; do
+  checkc "second worktree allows $t on its own file" 0 "$master" "$wt2" "$t" "$wt2/src/x.ts"
+done
+
+echo "== R9: worktree commands on master"
+for c in 'git worktree add .claude/worktrees/ABC-002 -b chore/ABC-002-x master' 'git worktree list' \
+  "git worktree remove $wt" 'git worktree remove .claude/worktrees/ABC-001' \
+  "git worktree add $master/.claude/worktrees/ABC-009 -b chore/ABC-009-x master" \
+  "git worktree add $other/outside -b chore/ABC-010-x master"; do
+  allowed "$c"
+done
+for c in 'git worktree remove --force x' 'git worktree remove -f x' 'git worktree remove x -f' \
+  'git worktree remove --forc x' 'git worktree remove --f x' 'git worktree add --forc p master' \
+  'git worktree add -f p master' 'git worktree add --force p master' 'git worktree add -B master p' \
+  'git worktree add src/foo -b chore/ABC-011-x master' "git worktree add $master/src/foo -b chore/ABC-011-x master" \
+  'git worktree add ../x -b chore/ABC-012-x master' 'git worktree add $X -b chore/ABC-013-x master' \
+  'git worktree add -b chore/ABC-014-x' \
+  'git worktree prune' 'git worktree move a b' 'git worktree lock x' 'git worktree unlock x' 'git worktree repair'; do
+  blocked "$c"
 done
 
 echo

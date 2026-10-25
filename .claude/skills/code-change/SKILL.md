@@ -1,6 +1,6 @@
 ---
 name: code-change
-description: Second step of the workflow, run by the user after a plan is approved. Creates the branch, writes the code and tests, runs checks, gets an independent code review whose findings are labelled caused-by-this-change yes/no, settles every finding itself (stopping to ask only for a plan conflict, data risk, an explanation the re-reviewer rejects, or a re-review that is still not clean after its last permitted round, or that needs a round only the user can authorise), re-runs checks, writes the documentation, and hands off for /commit-change. Run on an existing working branch it continues that change instead. Never merges to the default branch.
+description: Second step of the workflow, run by the user after a plan is approved. Creates the change's branch in a worktree of its own (so several changes can be coded at once, each in its own chat), writes the code and tests, runs checks, gets an independent code review whose findings are labelled caused-by-this-change yes/no, settles every finding itself (stopping to ask only for a plan conflict, data risk, an explanation the re-reviewer rejects, or a re-review that is still not clean after its last permitted round, or that needs a round only the user can authorise), re-runs checks, writes the documentation, and hands off for /commit-change. Run on an existing working branch it continues that change instead. Never merges to the default branch.
 disable-model-invocation: true
 ---
 
@@ -23,25 +23,36 @@ Run `git branch --show-current` on its own as a separate command first. The chan
 - Re-review rounds count across the whole change, not per run. A round whose open items carry "Settled by the user" counts as closed. If the record already shows three rounds and the last one wasn't clean and isn't closed that way, STOP and ask the user instead of starting another, and settle the open items according to their answer (see stop case 4 in step 7). If the record already shows three rounds and the last was clean but a gate failure needs a further fix, that fix's check is a round beyond the limit. The same applies if three rounds ended as "Settled by the user", or if an earlier extra round was already used and another fix is needed. A round beyond the third is never your decision: STOP, tell the user why it is needed, and run it only if they authorise it, recording their answer as "Settled by the user: <answer>" under that round. If an extra round isn't clean either, stop case 4 applies to it exactly as to a third round.
 - Do step 8, then in step 9 **append** to the existing review record: add a new round, and never rewrite or delete earlier rounds or findings. Do not add a second CHANGELOG entry; edit the existing one only if what the change does has changed. Then step 10.
 
+If the current branch is the default branch and the user names a change that already has a worktree (`git worktree list` shows one for its branch), you are also continuing: enter that worktree with `EnterWorktree` and its `path`, say so in one line, and carry on as above from the worktree.
+
 If the current branch is the default branch, or has no approved-plan commit, continue with step 1 as normal.
 
 ## 1. Find the plan
 - Use the plan written by `/plan-change` in this session.
-- If there isn't one, or it's unclear which plan file in `docs/plans/` to use, ask the user which one. STOP until they answer.
+- If there isn't one (the usual case, since each change is coded in a fresh chat), or it's unclear which plan file in `docs/plans/` to use, find the plans that are not being coded yet: the plan files with no `docs(<NUMBER>): approved plan` commit on any branch (`git log --all --grep`). Ignore the placeholder files that `/plan-change` leaves for numbers it has only claimed. Ask the user which one, in the question box if there are several. STOP until they answer.
 - Read the plan, including its change number (for example `ABC-085`) and its Check-in section (type, branch name, commit message).
 
-## 2. Check for other branches
-- Run `git branch` on its own, as a separate command, before anything else in this step. Never combine it with creating or switching a branch.
-- If any branch other than the default branch exists, list them in plain English and explain that the new branch will start from the default branch, so it won't include any work on those branches. `/code-change` is meant to be run from the default branch; if the current branch is not the default branch, say so as part of the list.
-- Ask whether to continue, or to deal with one of those branches first. STOP until they answer.
+## 2. Check for other changes in flight
+Several changes can be coded at once, each in its own worktree, so other branches are normal.
+- Run `git branch` and `git worktree list`, each on its own as a separate command, before anything else in this step. Never combine them with creating or switching a branch.
+- If the current branch is not the default branch, say so and STOP: a new change is started from the default branch.
+- If other working branches or worktrees exist, list them in one line each in plain English. They stay as they are; the new change starts from the default branch, so it won't include their work, and theirs won't include this one until they catch up at check-in.
+- For each of them, read its plan (`docs/plans/`, on the branch or waiting on the default branch) and compare the files its "Technical detail" names with the files this plan names. If any file appears in both, name the files and the other change, say that the second check-in to land will meet conflicts there, and ask whether to continue. STOP until they answer. If there is no overlap, say nothing more and go on.
 
 ## 3. Make the working copy
-- Run `git status` on its own, as a separate command, before switching or creating any branch. Never combine it with anything else. Check for uncommitted changes, other than the new plan file.
-  - If the plan says this change is the user's own existing edits, those edits are expected. Leave them in place; creating the branch below carries them onto it.
+If CLAUDE.md has no "Worktree folder" line, say so, and use the single-folder flow at the end of this step instead.
+- Run `git status` on its own, as a separate command, before creating any branch or worktree. Never combine it with anything else. Check for uncommitted changes, other than plan files (other planning chats may have plans waiting).
+  - If the plan says this change is the user's own existing edits, those edits are expected, but a worktree cannot carry them: use the single-folder flow at the end of this step and say why.
   - Any other uncommitted changes: show them and STOP until the user answers.
-- Switch to the default branch and update it from GitHub with `git pull --ff-only`. If it can't fast-forward, STOP and tell the user in plain English.
-- From the default branch, create the branch named in the plan's Check-in section.
+- Update the default branch from GitHub with `git pull --ff-only`. If it can't fast-forward, STOP and tell the user in plain English.
+- Create the worktree in the folder CLAUDE.md's "Worktree folder" line gives, on the branch named in the plan's Check-in section, from the default branch: `git worktree add <folder> -b <branch> <default branch>`.
+- Copy the plan file into the worktree's `docs/plans/`, check the copy is byte-for-byte identical to the original (`cmp`), and only then delete the original from the default branch's folder, so the later merge doesn't meet an untracked copy there. If the copy differs, STOP. Do all of this before entering the worktree: once inside it, the main folder can't be touched. Until the plan is committed in the worktree (below), the copy there is the only one; if the chat is interrupted in that window, the file is still in the worktree folder, so commit it as the approved plan from there.
+- If the plan asks for a copy of the database, copy the files CLAUDE.md's "Database files to copy into a worktree" line lists into the worktree's data folder (CLAUDE.md's "Data folder" line), including the `-wal` and `-shm` files when they exist. Only read the originals; never write to them. If CLAUDE.md has no such line, say so and ask the user which files to copy. Otherwise do not copy anything: the worktree starts with an empty data folder, and the app creates its own database there. Never point the worktree at the main folder's data.
+- Enter the worktree with `EnterWorktree` and its `path`. From here on every command and edit happens in the worktree.
+- Run the command CLAUDE.md's "Worktree setup" line gives, in the worktree (if CLAUDE.md has no such line, say so and ask the user what to run).
 - Commit the plan file as the first commit on the branch, with the message `docs(<NUMBER>): approved plan`. From here on, the plan file is frozen.
+
+**Single-folder flow** (no "Worktree folder" line, or the plan is the user's own existing edits): switch to the default branch if needed, run `git pull --ff-only` (STOP if it can't fast-forward), create the branch named in the plan's Check-in section from the default branch (this carries the user's edits onto it), and commit the plan file as the first commit on the branch, with the message `docs(<NUMBER>): approved plan`. `/commit-change` works the same way for such a branch, with nothing to remove.
 
 ## 4. Write the code
 - Build exactly what the plan describes. If something in the plan turns out to be wrong or impossible, STOP and explain. Do not improvise around it.
@@ -51,10 +62,10 @@ If the current branch is the default branch, or has no approved-plan commit, con
 - When the change edits a file outside the repository (so git can't show the edit), before editing it save a copy of the original on the branch as `docs/reviews/<NUMBER>-<file name>-before.md`, unchanged, and commit it with the records in step 9.
 - Commit work in progress on the branch as you go, with messages that start with the plan's type and number, for example `feat(ABC-085): add status table`. Nothing goes to the default branch in this step.
 - **Backlog items:** if the plan has a "Backlog items fixed" line, remove each named entry from `docs/BACKLOG.md` as part of the fix (the change's own records keep the history). If it has a "Backlog items accepted" section, add each item to `docs/DECISIONS.md` as an entry with this change's number, today's date and the user's reason from the plan, then remove it from `docs/BACKLOG.md`. These edits are part of the diff, so the Spec reviewer checks them.
-- Write migration scripts when the plan calls for them, but never run anything against files in the data folder (CLAUDE.md's "Data folder" line; if it has none, ask the user which files hold their data) unless the user's current message explicitly asks. If they do, take the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask the user how to back up).
+- Write migration scripts when the plan calls for them, but never run anything against files in the data folder (CLAUDE.md's "Data folder" line; if it has none, ask the user which files hold their data), a worktree's own data folder included, unless the user's current message explicitly asks. If they do, take the steps in CLAUDE.md's "Backup before a migration" line first (if CLAUDE.md has no such line, say so and ask the user how to back up).
 
 ## 5. Run the checks
-All of the checks listed under "Checks (all must pass)" in CLAUDE.md must pass before review, plus every check under "Checks (only when relevant)" whose condition applies to this change. Run each one as its own command, and never leave the shell in a different directory afterwards (use a subshell or a manifest/path flag for anything that has to run from a subfolder).
+All of the checks listed under "Checks (all must pass)" in CLAUDE.md must pass before review, plus every check under "Checks (only when relevant)" whose condition applies to this change. Run each one as its own command, and never leave the shell in a different directory afterwards (use a subshell or a manifest/path flag for anything that has to run from a subfolder). In a worktree, set the environment CLAUDE.md's "Worktree check environment" line gives for the checks it names (if CLAUDE.md has no such line, run them as they are).
 
 If something fails, fix it and re-run. If you can't fix it, STOP and report in plain English.
 
@@ -172,7 +183,8 @@ Tell the user in plain English:
 - The review findings, first: one plain-English line for every finding, giving its severity, whether this change caused it, what was found, and what was done (fixed; explained and why; or logged), including findings from every re-review round and whether the re-reviewer accepted each outcome. Never give counts or groups in place of the list. Then say how many re-review rounds ran, any time you stopped to ask the user and what they answered. If the re-reviewer or anything else left something open, say so plainly.
 - Which documents you created or changed, and why, so they can read them before checking in.
 - What to test by hand, after the review summary: list every numbered test (T1, T2, …) from the plan's "How you'll check it", in full, and next to each one show the trace-table results of the requirements it covers, so the user can see which ones Claude already checked.
+- Where the change lives: the worktree folder and branch, if it was coded in one, and that the app runs there with the project's normal run command, with its own data folder (empty unless the plan asked for a copy). Say plainly that anything entered in the app there lives only in the worktree and is deleted with it at check-in.
 - Whether there is a new migration. If so, remind them to take the steps in CLAUDE.md's "Backup before a migration" line before running it (if CLAUDE.md has no such line, say so and ask them how to back up), and that the app won't start against the database until it's run.
-- That when they're satisfied, they type `/commit-change`.
+- That when they're satisfied, they type `/commit-change` in this same chat; it steps out of the worktree itself.
 
 Do NOT merge or push. That is `/commit-change`'s job.

@@ -1,6 +1,9 @@
 // Decides whether a Bash/PowerShell command may run while on master/main.
-// Called by block-main-edits.sh with the PreToolUse JSON on stdin and the
-// project directory (e.g. /d/projects/foo or D:\Projects\Foo) as argv[2].
+// Called by block-main-edits.sh with the PreToolUse JSON on stdin and, as arguments:
+//   argv[2]  the main folder (e.g. /d/projects/foo or D:\Projects\Foo)
+//   argv[3]  'master' or 'worktree' (see worktreeMode below)
+//   argv[4]  the main folder in a form git itself understands (for git check-ignore)
+//   argv[5+] the paths of the repository's other worktrees, which are not guarded
 // Prints "allow" or "block: <reason>".
 //
 // This is best-effort pattern matching, not a sandbox. It does not look inside
@@ -8,9 +11,16 @@
 // anything built from variables. A path it cannot resolve counts as inside the
 // project, so it is blocked.
 
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 
 const proj = normPath(process.argv[2] || '');
+const projForGit = process.argv[4] || '';
+const otherWorktrees = process.argv.slice(5).map(normPath);
+// 'worktree' when the command runs inside a worktree of this project while the main
+// folder (proj) is on master: the worktree's own files are free to change, and only the
+// main folder is protected. Anything else is 'master': proj is the folder being guarded.
+const worktreeMode = process.argv[3] === 'worktree';
 
 // Git subcommands allowed as a whole, apart from the flags in destructiveGitFlag()
 // (tag -d, switch -f, branch -D) and --output (which writes a file).
@@ -77,6 +87,36 @@ function isPlanFile(n) {
   return !n.startsWith('/') && n.replace(/^\.\//, '').startsWith('docs/plans/');
 }
 
+// True when an absolute, normalised path is inside the guarded main folder. The
+// repository's other worktrees (which may sit inside it) are judged by their own branch,
+// so they don't count.
+function inMain(n) {
+  if (n !== proj && !n.startsWith(proj + '/')) return false;
+  return !otherWorktrees.some((w) => n === w || n.startsWith(w + '/'));
+}
+
+// In a worktree, true when a path points at the main folder or at something that can't be
+// resolved from the text (a variable, or a '..' that might climb into it).
+function pointsIntoMain(raw) {
+  const w = stripQuotes(raw);
+  if (w === '') return false;
+  if (/[$%`]/.test(w) || w.includes('..')) return true;
+  const n = normPath(w);
+  return n.startsWith('/') && inMain(path.posix.normalize(n));
+}
+
+// True when git ignores this path inside the main folder (so a checkout there can't land
+// in the tracked tree). Any failure counts as not ignored.
+function ignoredInMain(rel) {
+  if (!projForGit) return false;
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--', rel], { cwd: projForGit, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // True when writing to this path is allowed on master.
 function destOk(raw) {
   const w = stripQuotes(raw);
@@ -88,8 +128,10 @@ function destOk(raw) {
   let n = normPath(w);
   if (n.startsWith('/')) n = path.posix.normalize(n); // collapse any .. before comparing
   if (isPlanFile(n)) return true;
-  if (n.startsWith('/')) return !(n === proj || n.startsWith(proj + '/'));
-  return false; // relative: inside the project
+  if (n.startsWith('/')) return !inMain(n);
+  // Relative: inside the project on master. In a worktree it lands in the worktree itself,
+  // unless it climbs out with '..' (which could reach the main folder).
+  return worktreeMode && !n.includes('..');
 }
 
 // Finds the end of a $( ... ) or ` ... ` substitution starting at i; returns the index of its closer.
@@ -213,15 +255,140 @@ function destructiveGitFlag(sub, rest) {
   return null;
 }
 
-function gitCheck(args) {
+// True when a new worktree may be created at this path.
+function worktreeDestOk(raw) {
+  const w = stripQuotes(raw);
+  if (w === '' || /[$%`]/.test(w)) return false;
+  let n = normPath(w);
+  if (n.startsWith('/')) {
+    n = path.posix.normalize(n);
+    if (n !== proj && !n.startsWith(proj + '/')) return true; // outside the project
+    return n !== proj && ignoredInMain(n.slice(proj.length + 1));
+  }
+  if (w.includes('..')) return false;
+  // Relative: inside the main folder on master, and inside the worktree in a worktree.
+  return worktreeMode || ignoredInMain(path.posix.normalize(n));
+}
+
+// git's global options (before the subcommand). Those that take a value, and those that
+// don't; git matches these names exactly, so there are no abbreviations to allow for.
+const GLOBAL_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace', '--super-prefix', '--config-env', '--attr-source']);
+const GLOBAL_FLAGS = new Set([
+  '-v', '--version', '-h', '--help', '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects',
+  '--no-lazy-fetch', '--no-optional-locks', '--no-advice', '--bare', '--literal-pathspecs',
+  '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--exec-path', '--html-path',
+  '--man-path', '--info-path', '--list-cmds',
+]);
+
+// Splits the leading global options off a git command. Returns the options as
+// [name, value] pairs, whether any option wasn't recognised, and where the subcommand is.
+// Attached forms (-C/path, -ckey=value, --git-dir=path) are split the same way.
+function parseGlobals(args) {
+  const opts = [];
+  let unknown = false;
   let i = 0;
   while (i < args.length && args[i].startsWith('-')) {
     const a = args[i];
-    if (a === '-C' || a === '-c' || a === '--git-dir' || a === '--work-tree') i += 2;
-    else i += 1;
+    const eq = a.startsWith('--') ? a.indexOf('=') : -1;
+    const name = eq > 0 ? a.slice(0, eq) : a;
+    if (GLOBAL_WITH_VALUE.has(name)) {
+      if (eq > 0) { opts.push([name, a.slice(eq + 1)]); i += 1; }
+      else { opts.push([name, args[i + 1] || '']); i += 2; }
+    } else if (/^-C./.test(a)) {
+      opts.push(['-C', a.slice(2)]); i += 1;
+    } else if (/^-c./.test(a)) {
+      opts.push(['-c', a.slice(2)]); i += 1;
+    } else {
+      if (!GLOBAL_FLAGS.has(name)) unknown = true;
+      i += 1;
+    }
   }
+  return { opts, unknown, next: i };
+}
+
+// In a worktree, true when a git global option points git at the main folder (-C,
+// --git-dir, --work-tree) or could move its working tree (-c / --config-env on
+// core.worktree or core.bare), at something that can't be resolved, or isn't recognised,
+// so the master rules apply to the command.
+function redirectsIntoMain({ opts, unknown }) {
+  if (unknown) return true;
+  for (const [name, value] of opts) {
+    const v = stripQuotes(value);
+    if ((name === '-c' || name === '--config-env') && /^core\.(worktree|bare)\b/i.test(v)) return true;
+    if ((name === '-C' || name === '--git-dir' || name === '--work-tree') && pointsIntoMain(v)) return true;
+  }
+  return false;
+}
+
+// Git accepts any unambiguous prefix of a long option (--forc for --force).
+function isLong(a, full) {
+  const name = a.split('=')[0];
+  return name.length > 2 && name.startsWith('--') && full.startsWith(name);
+}
+
+function isForce(rest) {
+  return rest.some((a) => isLong(a, '--force') || (/^-[a-zA-Z]+$/.test(a) && a.includes('f')));
+}
+
+const DEFAULT_BRANCHES = ['master', 'main', 'refs/heads/master', 'refs/heads/main'];
+
+// In a worktree, the commands that could still reach the default branch, whose work
+// lives in the main folder, even though git itself runs inside the worktree.
+function worktreeRefRule(sub, rest) {
+  const nonOpt = rest.filter((a) => !a.startsWith('-'));
+  if (sub === 'update-ref') return 'git update-ref could move the default branch from a worktree';
+  if (sub === 'branch') {
+    const changes = rest.some((a) => isLong(a, '--force') || isLong(a, '--move') || isLong(a, '--delete')
+      || isLong(a, '--copy') || /^-[a-zA-Z]*[fMmDdCc]/.test(a));
+    if (changes && nonOpt.some((a) => DEFAULT_BRANCHES.includes(a))) return 'git branch changing the default branch from a worktree';
+  }
+  if (sub === 'push') {
+    if (rest.some((a) => isLong(a, '--mirror'))) return 'git push --mirror from a worktree';
+    for (const r of nonOpt.slice(1)) {
+      const dst = r.replace(/^\+/, '').split(':').pop();
+      if (DEFAULT_BRANCHES.includes(dst)) return 'git push to the default branch from a worktree';
+    }
+  }
+  if (sub === 'fetch') {
+    // fetch <remote> <src>:<dst> updates a local branch; with -u/--update-head-ok that can
+    // be the checked-out default branch. Plain `fetch origin master` only updates origin/master.
+    for (const r of nonOpt.slice(1)) {
+      if (!r.includes(':')) continue;
+      if (DEFAULT_BRANCHES.includes(r.replace(/^\+/, '').split(':').pop())) return 'git fetch into the default branch from a worktree';
+    }
+  }
+  if (sub === 'config') {
+    // Any non-option word may be the key (a leading `set`, or the value of --type, can sit
+    // in front of it), and -f/--file names the config file being written.
+    let file = null;
+    const words = [];
+    for (let k = 0; k < rest.length; k++) {
+      const a = rest[k];
+      if (a === '-f' || (isLong(a, '--file') && !a.includes('='))) file = rest[++k] || '';
+      else if (isLong(a, '--file')) file = a.slice(a.indexOf('=') + 1);
+      else if (/^-f./.test(a)) file = a.slice(2); // attached: -f<path>
+      else if (!a.startsWith('-')) words.push(a);
+    }
+    if (words.length >= 2 && words.some((w) => /^core\.(worktree|bare)$/i.test(w))) {
+      return 'git config core.worktree / core.bare could redirect git for every worktree';
+    }
+    if (file !== null && words.length >= 1 && pointsIntoMain(file)) return 'git config writing the main folder\'s config file';
+  }
+  return null;
+}
+
+function gitCheck(args) {
+  const globals = parseGlobals(args);
+  const i = globals.next;
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
+  if (worktreeMode && !redirectsIntoMain(globals)) {
+    // Git inside the worktree is free, apart from the few commands that reach the default
+    // branch or other worktrees; those get the extra rules above, and worktree its own below.
+    const why = worktreeRefRule(sub, rest);
+    if (why) return why;
+    if (sub !== 'worktree') return null;
+  }
   if (sub === '') return null;
   if (rest.some((a) => a.startsWith('--output'))) return `git ${sub} --output writes a file`;
   const destructive = destructiveGitFlag(sub, rest);
@@ -245,6 +412,28 @@ function gitCheck(args) {
     }
     case 'checkout':
       return rest[0] === '-b' && rest.length >= 2 ? null : 'git checkout is only allowed as checkout -b';
+    case 'worktree': {
+      // add, list and a plain remove only. Force (-f, -ff, --force) would let a branch be
+      // checked out twice or a dirty worktree be thrown away; -B resets an existing branch.
+      const verb = nonOpt[0];
+      if (verb === 'list') return null;
+      const force = isForce(rest);
+      if (verb === 'remove') return force ? 'forced git worktree remove' : null;
+      if (verb === 'add') {
+        if (force || rest.some((a) => /^-[a-zA-Z]*B/.test(a))) return 'forced git worktree add';
+        // The new checkout may not land in the project's tracked tree: inside the main
+        // folder it has to be a path git ignores.
+        let dest = null;
+        const args2 = rest.slice(rest.indexOf('add') + 1);
+        for (let k = 0; k < args2.length; k++) {
+          if (args2[k] === '-b') { k++; continue; }
+          if (!args2[k].startsWith('-')) { dest = args2[k]; break; }
+        }
+        if (dest === null) return 'git worktree add without a path is not allowed';
+        return worktreeDestOk(dest) ? null : `git worktree add ${dest} would put a checkout inside the project`;
+      }
+      return verb ? `git worktree ${verb} is not allowed` : 'git worktree without a subcommand is not allowed';
+    }
     default:
       return `git ${sub} is not allowed`;
   }
@@ -304,15 +493,40 @@ function commandIndex(ws) {
   }
 }
 
+// Commands that change the shell's directory. This checker doesn't follow the directory,
+// so in a worktree they may not point into the main folder: relative writes after one
+// would land there.
+const CD_COMMANDS = new Set(['cd', 'chdir', 'pushd', 'set-location', 'sl', 'push-location']);
+
+// In a worktree, a word that points git at the main folder through the environment
+// (GIT_DIR=..., GIT_WORK_TREE=..., export GIT_DIR=..., $env:GIT_DIR = '...').
+function gitEnvIntoMain(ws) {
+  for (let k = 0; k < ws.length; k++) {
+    const w = stripQuotes(ws[k]);
+    const m = w.match(/^(?:\$env:)?GIT_(?:DIR|WORK_TREE)=(.*)$/i);
+    if (m && pointsIntoMain(m[1])) return true;
+    if (/^\$env:GIT_(?:DIR|WORK_TREE)$/i.test(w) && pointsIntoMain(ws[k + 2] || '')) return true;
+  }
+  return false;
+}
+
 function segmentCheck(words, depth) {
   const { words: ws, targets } = splitRedirects(words);
   for (const t of targets) {
     if (!destOk(t)) return `redirect to ${stripQuotes(t)}`;
   }
+  if (worktreeMode && gitEnvIntoMain(ws)) return 'git pointed at the main folder through the environment';
   const i = commandIndex(ws);
   if (i >= ws.length) return null;
   const name = stripQuotes(ws[i]).replace(/\\/g, '/').split('/').pop().toLowerCase().replace(/\.exe$/, '');
   const args = ws.slice(i + 1);
+
+  if (worktreeMode && CD_COMMANDS.has(name)) {
+    for (const d of destinations('first-path', args)) {
+      if (pointsIntoMain(d)) return `${name} into the main folder`;
+    }
+    return null;
+  }
 
   if (name === 'git') return gitCheck(args);
 

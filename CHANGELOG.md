@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-015 (chore) Each change is now coded in its own worktree, so several can be coded at once in separate chats: /plan-change claims change and migration numbers at once, /code-change works in a worktree with its own empty database and dev-server port, /commit-change merges from it, resolves a changelog-only clash and removes it, /build-changes builds what is merged while others are open, and the guard hook protects master from every folder.
 - PWF-014 (chore) When "Plan it now" sets aside your original /plan-change request, the plan now records it word for word, and /commit-change's final report ends with it as a ready-to-paste /plan-change command.
 - PWF-013 (chore) The inert plan-renaming script, its after-plan-mode hook entry and the plan-folder setting are removed from the project settings; plan mode stays blocked. The matching backlog entry is removed.
 - PWF-012 (chore) The shared policy's change-number and commit-message examples now use the neutral `ABC-085` instead of this project's real `DTP-085`; the matching backlog entry is removed.

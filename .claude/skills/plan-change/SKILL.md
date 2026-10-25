@@ -18,14 +18,17 @@ Never skip the interview or the play-back. If the request already answers everyt
 ## 1. Look before asking
 - Read CLAUDE.md and the shared POLICY.md if they aren't already loaded.
 - Read the code the idea touches. Look things up yourself instead of asking the user questions the code can answer.
-- Run `git status`. If there are uncommitted edits (other than plan files), list them and ask the user whether they are part of this change. If they are, the plan must say so and describe them, so `/code-change` carries them onto the branch.
+- Run `git status`. If there are uncommitted edits (other than plan files, which other planning chats may have waiting), list them and ask the user whether they are part of this change. If they are, the plan must say so and describe them, so `/code-change` carries them onto the branch.
 - If the request is a bug report, find the actual root cause first using the diagnosing-bugs skill, then plan the fix.
 
 ## 2. Assign the change number
 - The change prefix is set in the Workflow section of CLAUDE.md. If CLAUDE.md doesn't set one, ask the user and STOP until they answer.
-- Find the highest existing number for that prefix (for example `ABC-084`) in both `CHANGELOG.md` and the file names in `docs/plans/`. The new change gets the next number, written with three digits (`ABC-085`).
-- If no numbers exist yet in either place, do not guess. Ask the user which number to use and STOP until they answer.
+- Several planning chats can run at once, so a number is claimed the moment it is assigned. Find the highest existing number for that prefix (for example `ABC-084`) in `CHANGELOG.md`, in the file names in `docs/plans/`, and in the names of all local branches (`git branch --list`, which includes the branches of changes being coded in worktrees). The new change gets the next number, written with three digits (`ABC-085`).
+- If no numbers exist yet in any of those places, do not guess. Ask the user which number to use and STOP until they answer.
+- Claim it at once: save a placeholder `docs/plans/<NUMBER>-claimed-<six random letters>.md` containing one line saying the number is claimed by a `/plan-change` that is still running. Then list the files in `docs/plans/` that start with that number. If another claim or plan for the same number now exists, the file whose name sorts first keeps the number; the others delete their placeholder and repeat this step with the next number.
 - Tell the user the number in one line, for example: "This change is ABC-085."
+- A number is never reused. If the planning is abandoned, the placeholder stays and the number is simply skipped. The user can delete it by hand.
+- **Migration numbers:** if CLAUDE.md has a "Migrations" line, then as soon as the interview shows the change needs a migration, claim its number the same way: the next free number after the highest in the migrations folder CLAUDE.md names, in every plan in `docs/plans/` that names a migration, and in every local branch's changes to that folder (`git diff --name-only <default branch>...<branch> -- <folder>`). Write the claim into the placeholder file, and put it in the plan. If CLAUDE.md has no "Migrations" line, skip this, and tell the user the migration steps were skipped because CLAUDE.md has no such line.
 
 ## 3. Put the backlog to the user
 Read `docs/BACKLOG.md`. If it is missing or has no entries, say nothing and go to step 4. Otherwise, before the interview, put every entry to the user, new and queued alike, one at a time, in the question box (AskUserQuestion), one question per box, in the order they appear in the file. Asking every time is deliberate: it keeps the backlog small. Show the entry's title, where it was found, its severity and what is wrong, and offer exactly three choices:
@@ -54,7 +57,7 @@ Sum up the shared understanding in a few plain-English sentences, list the propo
 Wait for a yes. A yes covers the requirements too. If the user corrects anything, including a requirement, fix your understanding and play it back again.
 
 ## 6. Write the plan file
-Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated.
+Save the plan to `docs/plans/<NUMBER>-<short-title>.md`, for example `docs/plans/ABC-085-docs-cleanup.md`. The short title is lowercase and hyphenated. Then delete this change's own placeholder file from step 2.
 
 Use exactly this format. The top sections are for the user: plain English, no code, SQL, or file paths.
 
@@ -131,4 +134,4 @@ Tell the user, in plain English:
 - To read it, and to ask for any changes they want. If they ask for changes, update the plan file and stop again.
 - That when they're happy with it, they type `/code-change` to start coding.
 
-Do not start coding. Do not create a branch. Wait.
+Do not start coding. Do not create a branch or a worktree. Wait.
