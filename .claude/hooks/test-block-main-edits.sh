@@ -211,10 +211,12 @@ for c in 'git config core.hooksPath ""' 'git config core.hooksPath /nonexistent'
   blocked "$c"
   bothc "worktree session blocks: $c" 2 "$master" "$wt" "$c"
 done
-for c in 'git config --get core.hooksPath' 'git config get core.hooksPath' 'git config core.hooksPath' 'git config --list'; do
+for c in 'git config --get core.hooksPath' 'git config core.hooksPath' 'git config --list'; do
   allowed "$c"
   bothc "worktree allows: $c" 0 "$master" "$wt" "$c"
 done
+# On master every two-word `git config` was already blocked (the older rule), so only the worktree case is new.
+bothc "worktree allows: git config get core.hooksPath" 0 "$master" "$wt" 'git config get core.hooksPath'
 
 echo
 echo "$pass passed, $fail failed"
