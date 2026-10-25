@@ -6,6 +6,7 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-017 (chore) Added the master lock: a git hook that refuses any update of master that is not a proper check-in (every change from PWF-016 on needs a review record that passes the commit-change gate; release commits may touch only the version files and the changelog), however the commit arrives. One shared checker serves the hook and /commit-change, which now also numbers its catch-up merge; /commit-change and /build-changes stop if the lock is off, and the guard hook stops Claude from switching it off.
 - PWF-020 (chore) Every /plan-change play-back now uses one fixed format: a normal message with a Summary, the Requirements and the Decisions so far, ending in "Is that right?" as plain text (no question box); a corrected play-back says at the top what changed.
 - PWF-018 (chore) /code-change now loads the worktree tools, enters the worktree and checks the folder and branch, stopping if it can't, so /commit-change can step out of it from the same chat; /commit-change loads the tools too.
 - PWF-016 (chore) A by-design reason tied to one spot in the code now goes in a "why" comment at that spot, a project-wide one in docs/DECISIONS.md; /code-change and the Standards reviewer follow the rule, and the shared policy states it.

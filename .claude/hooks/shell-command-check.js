@@ -377,11 +377,31 @@ function worktreeRefRule(sub, rest) {
   return null;
 }
 
+// The master lock (the project's tracked hooks folder) is switched on by git's
+// core.hooksPath, so changing that setting switches the lock off. That is a step only the
+// user takes, in their own terminal (see CLAUDE.md, "Master lock"), so it is blocked in
+// every mode: git -c / --config-env, and git config writes. Reading it stays allowed.
+const HOOKS_PATH = /^core\.hookspath\b/i;
+const GIT_CONFIG_ENV = /^(?:\$env:)?GIT_CONFIG_(?:COUNT|PARAMETERS|KEY_\d+|VALUE_\d+|GLOBAL|SYSTEM|NOSYSTEM)(?:=|$)/i;
+function masterLockRule({ opts }, sub, rest) {
+  for (const [name, value] of opts) {
+    if ((name === '-c' || name === '--config-env') && HOOKS_PATH.test(stripQuotes(value))) return 'git -c core.hooksPath would switch the master lock off';
+  }
+  if (sub === 'config' && rest.some((a) => /^core\.hookspath$/i.test(a))) {
+    const words = rest.filter((a) => !a.startsWith('-'));
+    const isRead = rest.some((a) => CONFIG_READ.has(a)) || words[0] === 'get';
+    if (!isRead && (rest.some((a) => CONFIG_WRITE.has(a)) || words.length >= 2)) return 'git config core.hooksPath would switch the master lock off';
+  }
+  return null;
+}
+
 function gitCheck(args) {
   const globals = parseGlobals(args);
   const i = globals.next;
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
+  const lockOff = masterLockRule(globals, sub, rest);
+  if (lockOff) return lockOff;
   if (worktreeMode && !redirectsIntoMain(globals)) {
     // Git inside the worktree is free, apart from the few commands that reach the default
     // branch or other worktrees; those get the extra rules above, and worktree its own below.
@@ -516,6 +536,7 @@ function segmentCheck(words, depth) {
     if (!destOk(t)) return `redirect to ${stripQuotes(t)}`;
   }
   if (worktreeMode && gitEnvIntoMain(ws)) return 'git pointed at the main folder through the environment';
+  if (ws.some((w) => GIT_CONFIG_ENV.test(stripQuotes(w)))) return 'git settings given through the environment could switch the master lock off';
   const i = commandIndex(ws);
   if (i >= ws.length) return null;
   const name = stripQuotes(ws[i]).replace(/\\/g, '/').split('/').pop().toLowerCase().replace(/\.exe$/, '');
