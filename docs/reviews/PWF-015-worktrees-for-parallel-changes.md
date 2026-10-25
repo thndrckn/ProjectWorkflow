@@ -133,8 +133,8 @@ The fresh re-reviewer checked the `-f<path>` fix: attached `-f` with paths into 
 | R10 | Automated: the hook test script, `git worktree add`, `list` and unforced `remove` allowed on master; forced, abbreviated-force, `prune`, `move`, `lock` and `repair` blocked | Pass |
 
 ## Deviations from the plan
-- The claim placeholder file is `<NUMBER>-claimed-<six random letters>.md`, not `<NUMBER>-claimed.md`, so a clash between two chats can be detected (see `docs/DECISIONS.md`).
-- `/code-change` has a single-folder fallback (for a plan that is the user's own uncommitted edits, and for a project without a "Worktree folder" line), which the plan did not mention (see `docs/DECISIONS.md`).
+- The claim placeholder file is `<NUMBER>-claimed-<six random letters>.md`, not `<NUMBER>-claimed.md`, so a clash between two chats can be detected (see `docs/DECISIONS.md`). **Approved by the user** after the hand-off, who accepted this decision as recorded in `docs/DECISIONS.md`.
+- `/code-change` has a single-folder fallback (for a plan that is the user's own uncommitted edits, and for a project without a "Worktree folder" line), which the plan did not mention (see `docs/DECISIONS.md`). **Approved by the user** after the hand-off, who accepted this decision as recorded in `docs/DECISIONS.md`.
 - `/code-change` verifies the plan copy with `cmp` before deleting the original, and `/commit-change` gives a plain heads-up before deleting the worktree's data folder (both from review findings; neither contradicts the plan).
 - The guard went further than the plan's wording: the main-folder protection in a worktree also covers `cd`, git environment variables, `-c core.worktree`, git config writes, fetch and push to the default branch, and `git worktree add` must land on a git-ignored path. All of it serves R5.
 - The guard asks `git worktree list` where the other worktrees are, instead of a fixed folder, so it names no project folder.
