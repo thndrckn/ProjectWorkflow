@@ -64,7 +64,7 @@ Save `docs/reviews/<same file name as the plan>.md` (a ticket: `docs/reviews/<NU
 ## Summary
 <two sentences>
 ```
-A Fail can only be fixed, then re-reviewed. "Manual" is left for Jason to run before the merge.
+A Fail can only be fixed, then re-reviewed. A "Manual" check is run by Jason before the merge and its result changed to "Pass (checked by Jason)"; the lock refuses any result that is not a Pass. If the re-review found anything new, "Re-review clean" is `no` and Jason's decision on what is left is written as `**Decided by:** Jason` in that section. For the last ticket of a large change, also write the change's own record (findings carried, and a trace row per ticket).
 
 ## 8. Approve
 Show Jason the record in plain English and ask him to approve it. His approval is the proof a decision was made; the lock only checks the record is complete. A small change ends: *"Next: `/merge-change`."* A ticket merges into the integration branch with `git merge --no-ff` (message `chore(<NUMBER>.<N>): merge ticket`), then offers the next unblocked ticket: *"Next: `/code-change <NUMBER>.<N+1>`."*, or *"Next: `/merge-change`."* when all are done. Never merge into the default branch here.

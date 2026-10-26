@@ -1,24 +1,17 @@
-// The trunk lock's checker. One script, three modes, so the git hook and /commit-change
+// The trunk lock's checker. One script, three modes, so the git hook and /merge-change
 // apply exactly the same rules:
-//   hook <state>            run by .githooks/reference-transaction on every ref update;
+//   hook <state>            run by githooks/reference-transaction on every ref update;
 //                           exits non-zero to refuse an update of the default branch.
-//   gate <number> [--rev R] the review-record gate for one change (the record in the
+//   gate <number> [--rev R] the review-record gate for one change or ticket (the record in the
 //                           working tree, or in revision R); exit 1 if it fails.
 //   status                  is the lock switched on in this copy of the project?
 //
-// Nothing project-specific lives here: the default branch, change prefix, version files
-// and the first checked change number come from CLAUDE.md (see readConfig). The written
-// rules this implements are the "Review gate" in /commit-change and the policy's peer
-// review section; they stay the specification. The gate reads a record's labelled lines exactly.
-// A record in review format 2 (the header line "Review format: accountability 2", or any record
-// that carries the fixed re-review lines) also has its re-review verdicts read exactly: a
-// "**Re-review (round N):** accepted|rejected" line under each finding, the same line naming a
-// requirement for a fixed Fail, and a "**Round N clean:** yes|no" line closing each round. Only a
-// record in the old format (the marker without the 2, or none) still has its rounds read by
-// keyword (a rejection, "clean", a verdict word such as accepted/resolved), so for those it cannot
-// check item by item that each outcome was accepted. CLAUDE.md's "Review format 2 required from"
-// line makes format 2 mandatory from a change number on. /commit-change reads the record itself as
-// well and stops if the two disagree.
+// Nothing project-specific lives here: the default branch, change prefix, version files and the
+// first checked change number come from CLAUDE.md (see readConfig). The gate reads a record's
+// labelled lines exactly (the format is written in /code-change). It checks a record is complete;
+// it cannot prove Jason made a decision, and his approval of the review is that proof.
+// Numbers are NNN for a change and NNN.N for a ticket of a large change. Only a whole number is a
+// check-in: a ticket's commits may reach the default branch only inside their change's check-in.
 //
 // Every unexpected problem refuses (exit 2): the lock fails closed.
 
@@ -84,21 +77,12 @@ function readConfig(claudeMd) {
     if (!m) problems.push(`"Trunk lock starts at" (the older "Master lock starts at") (${startRaw}) is not a change number with the prefix ${prefix}`);
     else start = parseInt(m[1], 10);
   }
-  // Optional: a project without the line requires no particular record format. A line that is
-  // present but unreadable is a problem, never a silent "no requirement" (that would loosen the lock).
-  let format2From = null;
-  let format2Raw = null;
-  const f2Line = lineValue(claudeMd, 'Review format 2 required from');
-  if (f2Line !== null) {
-    format2Raw = firstWord(f2Line);
-    const m = prefix && format2Raw ? format2Raw.match(new RegExp(`^${esc(prefix)}-(\\d{3,})$`)) : null;
-    if (!m) problems.push(`"Review format 2 required from" (${format2Raw ?? 'empty'}) is not a change number with the prefix ${prefix}`);
-    else format2From = parseInt(m[1], 10);
-  }
-  return { ok: problems.length === 0, problems, defaultBranch, prefix, versionFiles, start, startRaw, format2From, format2Raw };
+  return { ok: problems.length === 0, problems, defaultBranch, prefix, versionFiles, start, startRaw };
 }
 
 // ---------------------------------------------------------------- the review gate
+// One record format (see /code-change). The gate checks that a record is complete and consistent;
+// it cannot prove Jason made a decision. His approval of the review is that proof.
 
 function splitSections(text) {
   const sections = {};
@@ -123,7 +107,6 @@ function findingBlocks(body) {
   for (let i = 0; i < lines.length; i++) {
     if (!/^- /.test(lines[i])) continue;
     const block = [lines[i]];
-    // The block runs over indented lines, and over blank lines that are followed by more indented text.
     for (let j = i + 1; j < lines.length; j++) {
       if (lines[j].trim() === '') continue;
       if (!/^\s+\S/.test(lines[j])) break;
@@ -131,71 +114,40 @@ function findingBlocks(body) {
       i = j;
     }
     const text = block.join('\n');
-    // A bullet is a finding if it has the severity form, or carries a finding's own labelled lines
-    // (so a finding written without the severity form is caught and refused, not skipped).
-    if (/^- \*\*\[[^\]]*\]\*\*/.test(text) || /\*\*(?:Caused by this change|Disposition):\*\*/.test(text)) blocks.push(text);
+    // A bullet is a finding if it has the severity form or a finding's own labelled line, so one
+    // written without the severity form is refused, not skipped.
+    if (/^- \*\*\[[^\]]*\]\*\*/.test(text) || /\*\*(?:Caused by this change|Outcome):\*\*/.test(text)) blocks.push(text);
   }
   return blocks;
 }
 
+const DECIDED = /\*\*Decided by:\*\*\s*\**\s*Jason\b/i;
+
 function judgeFinding(block) {
   const title = block.split('\n')[0].replace(/^- /, '').slice(0, 90);
   const sev = block.match(/^- \*\*\[([^\]]*)\]\*\*/);
-  let severity = sev && SEVERITIES.includes(sev[1]) ? sev[1] : null;
+  const severity = sev && SEVERITIES.includes(sev[1]) ? sev[1] : null;
   const labelMatch = block.match(/\*\*Caused by this change:\*\*\s*\**\s*(yes|no)\b/i);
-  let label = labelMatch ? labelMatch[1].toLowerCase() : null;
-  const dispMatch = block.match(/\*\*Disposition:\*\*\s*\**\s*([A-Za-z]+)/);
-  let disposition = null;
-  if (dispMatch) disposition = ['fixed', 'explained', 'logged'].includes(dispMatch[1].toLowerCase()) ? dispMatch[1].toLowerCase() : 'other';
-
-  // The gate reads a finding as corrected by its latest "Correction (round N)" line.
-  const corrections = block.split(/\*\*Correction \(round \d+\):\*\*/).slice(1);
-  if (corrections.length > 0) {
-    const c = corrections[corrections.length - 1];
-    const cl = c.match(/caused(?: by this change)?:?\s*\**\s*(yes|no)\b/i);
-    if (cl) label = cl[1].toLowerCase();
-    const cs = c.match(/\[(High|Medium|Low|Nit|Informational)\]/);
-    if (cs) severity = cs[1];
-    const cd = c.match(/Disposition (?:is now|now reads|:)\s*\**\s*(fixed|explained|logged)/i) || c.match(/^\s*\**\s*(fixed|explained|logged)\b/i);
-    if (cd) disposition = cd[1].toLowerCase();
-  }
-  const settled = /Settled by the user:/.test(block);
+  const label = labelMatch ? labelMatch[1].toLowerCase() : null;
+  const outMatch = block.match(/\*\*Outcome:\*\*\s*\**\s*(fixed|explained|accepted by Jason|moved to backlog)\b/i);
+  const outcome = outMatch ? outMatch[1].toLowerCase() : null;
+  const verdicts = [...block.matchAll(/\*\*Re-review:\*\*\s*\**\s*(accepted|rejected)\b/gi)].map((m) => m[1].toLowerCase());
+  const decided = DECIDED.test(block);
   const failures = [];
   if (!severity) failures.push(`A finding has no severity: "${title}".`);
-  if (!label) failures.push(`A finding has no "Caused by this change: yes/no" label: "${title}".`);
-  if (!disposition) failures.push(`A finding has no disposition: "${title}".`);
-  else if (disposition === 'other') failures.push(`A finding is left open or accepted as is, not fixed, explained or logged: "${title}".`);
-  if (label === 'yes' && disposition === 'logged' && !settled) {
-    failures.push(`A finding this change caused was logged instead of fixed or explained: "${title}".`);
+  if (!label) failures.push(`A finding has no "Caused by this change: yes/no" line: "${title}".`);
+  if (!outcome) failures.push(`A finding has no outcome (fixed, explained, accepted by Jason or moved to backlog): "${title}".`);
+  if (label === 'yes' && outcome === 'moved to backlog') {
+    failures.push(`A finding this change caused was moved to the backlog instead of fixed, explained or accepted by Jason: "${title}".`);
+  }
+  if (outcome === 'accepted by jason' && !decided) failures.push(`A finding accepted by Jason does not say "Decided by: Jason": "${title}".`);
+  if (outcome === 'fixed' || outcome === 'explained') {
+    if (verdicts.length === 0) failures.push(`A ${outcome} finding has no "Re-review: accepted/rejected" line: "${title}".`);
+    else if (verdicts[verdicts.length - 1] === 'rejected' && !decided) {
+      failures.push(`The re-review rejected the outcome of a finding and the record does not say "Decided by: Jason": "${title}".`);
+    }
   }
   return failures;
-}
-
-function splitRounds(body) {
-  const rounds = [];
-  const parts = body.split(/^### Round (\d+)([^\n]*)$/m);
-  for (let i = 1; i < parts.length; i += 3) rounds.push({ n: parseInt(parts[i], 10), heading: parts[i + 1], text: parts[i + 2] });
-  return rounds;
-}
-function hasRejection(text) {
-  const t = text
-    .replace(/\b(?:no|none|nothing|zero|without any)\s+(?:\w+\s+){0,3}(?:rejections?|rejected)\b/gi, '')
-    .replace(/\b(?:not|never)\s+rejected\b/gi, '')
-    .replace(/\brejections?:\s*(?:none|no)\b/gi, '')
-    .replace(/\brejected\s+(?:nothing|none)\b/gi, '');
-  return /\b(?:rejected|rejects|rejection|did not accept|does not accept|not accepted)\b/i.test(t);
-}
-function saysNotClean(text) {
-  return /not clean|clean:\s*\**\s*no\b|isn'?t clean|wasn'?t clean|was not clean/i.test(text);
-}
-// A round that says in so many words that it was clean cannot be holding a standing rejection:
-// "clean" means every outcome was accepted. So a rejection mentioned in passing (an earlier
-// outcome that was then fixed and accepted) does not fail such a round.
-function statesCleanRound(text) {
-  return !saysNotClean(text) && /round clean:\s*\**\s*yes\b|\b(?:round|it) (?:was|is) \**clean\b/i.test(text);
-}
-function isCleanRound(text) {
-  return !saysNotClean(text) && /\bclean\b/i.test(text);
 }
 
 function traceRows(body) {
@@ -209,195 +161,90 @@ function traceRows(body) {
   return rows;
 }
 
-// Review format 2: the fixed lines. The marker alone makes a record format 2; so does any fixed line,
-// so dropping the marker does not get a record back onto keyword reading.
-const FORMAT2_MARKER = /^- \*\*Review format:\*\* accountability 2\b/m;
-const FINDING_VERDICT = /\*\*Re-review \(round (\d+)\):\*\*\s*(accepted|rejected)\b/g;
-const FAIL_VERDICT = /\*\*Re-review \(round (\d+)\):\*\*\s*(R[A-Za-z0-9]+)[:\s]+(accepted|rejected)\b/g;
-const ROUND_CLEAN = /\*\*Round (\d+) clean:\*\*\s*(yes|no)\b/g;
-const RAISED_IN = /\*\*Raised in round:\*\*\s*(\d+)/;
-function hasFormat2Lines(text) {
-  return /\*\*Re-review \(round \d+\):\*\*/.test(text) || /\*\*Round \d+ clean:\*\*/.test(text);
-}
-function blockTitle(block) {
-  return block.split('\n')[0].replace(/^- /, '').slice(0, 90);
-}
-// The verdict of the highest round wins; within one round the later line wins.
-function latestVerdict(verdicts) {
-  let best = null;
-  for (const v of verdicts) if (best === null || v.round >= best.round) best = v;
-  return best;
-}
-
-// A round's `Round N clean:` values, for lines naming its own number.
-function roundCleanLines(round) {
-  return [...round.text.matchAll(ROUND_CLEAN)].filter((m) => parseInt(m[1], 10) === round.n).map((m) => m[2]);
-}
-function isCleanRound2(round) {
-  const lines = roundCleanLines(round);
-  return lines.includes('yes') && !lines.includes('no');
-}
-// Requirement ids are compared without bold marks or punctuation, so "**R3**" in the trace table matches "R3:".
-function idKey(id) {
-  return id.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-// The re-review rounds of a format 2 record, read exactly. `rounds` is the list of { n, heading, text }
-// that splitRounds returns; `trace` the rows of the requirements trace.
-function judgeFormat2Rounds({ blocks, rounds, trace, fixedFail }) {
-  const failures = [];
-  const known = new Set(rounds.map((r) => r.n));
-  const raisedIn = new Map(); // block -> round that raised it
-  for (const b of blocks) {
-    const m = b.match(RAISED_IN);
-    if (m) raisedIn.set(b, parseInt(m[1], 10));
-  }
-
-  for (const b of blocks) {
-    if (/Settled by the user:/.test(b)) continue;
-    const title = blockTitle(b);
-    const verdicts = [...b.matchAll(FINDING_VERDICT)].map((m) => ({ round: parseInt(m[1], 10), verdict: m[2] }));
-    const latest = latestVerdict(verdicts);
-    if (latest === null) { failures.push(`A finding has no "Re-review (round N): accepted" line: "${title}".`); continue; }
-    if (!known.has(latest.round)) failures.push(`A finding's re-review line names round ${latest.round}, which is not recorded: "${title}".`);
-    if (raisedIn.has(b) && latest.round <= raisedIn.get(b)) {
-      failures.push(`A finding raised in round ${raisedIn.get(b)} has a verdict from round ${latest.round}, which cannot have checked it: "${title}".`);
-    }
-    if (latest.verdict === 'rejected') failures.push(`A finding's latest re-review verdict is a rejection: "${title}".`);
-  }
-
-  // A fixed failed requirement needs its own verdict line, naming the requirement.
-  const failVerdicts = rounds.flatMap((r) => [...r.text.matchAll(FAIL_VERDICT)].map((m) => ({ round: parseInt(m[1], 10), id: idKey(m[2]), verdict: m[3] })));
-  if (fixedFail) {
-    for (const row of trace.filter((t) => /fixed after fail/i.test(t.result))) {
-      const latest = latestVerdict(failVerdicts.filter((v) => v.id === idKey(row.id)));
-      if (latest === null) failures.push(`Requirement ${row.id} was fixed after a Fail but no "Re-review (round N): ${row.id} accepted" line records the check.`);
-      else if (latest.verdict === 'rejected') failures.push(`Requirement ${row.id} was fixed after a Fail and its latest re-review verdict is a rejection.`);
-    }
-  }
-  for (const v of failVerdicts) if (!known.has(v.round)) failures.push(`A re-review line for ${v.id} names round ${v.round}, which is not recorded.`);
-
-  rounds.forEach((r, idx) => {
-    const settled = /Settled by the user:/.test(r.text);
-    if (idx >= 3 && !settled) {
-      failures.push(`Round ${r.n} is beyond the third and does not carry "Settled by the user:" authorising it.`);
-    }
-    const lines = roundCleanLines(r);
-    if (lines.length === 0 && !settled) failures.push(`Round ${r.n} has no "Round ${r.n} clean: yes/no" line.`);
-    if (lines.length > 1) failures.push(`Round ${r.n} has ${lines.length} "Round ${r.n} clean" lines; it needs exactly one.`);
-    if (isCleanRound2(r)) {
-      const rejects = [
-        ...blocks.flatMap((b) => [...b.matchAll(FINDING_VERDICT)].filter((m) => parseInt(m[1], 10) === r.n && m[2] === 'rejected')),
-        ...failVerdicts.filter((v) => v.round === r.n && v.verdict === 'rejected'),
-      ];
-      if (rejects.length > 0) failures.push(`Round ${r.n} is marked clean but records a rejection.`);
-      const raised = blocks.filter((b) => raisedIn.get(b) === r.n);
-      if (raised.length > 0) failures.push(`Round ${r.n} is marked clean but raised a new finding: "${blockTitle(raised[0])}".`);
-    }
-  });
-
-  if (rounds.length > 0) {
-    const last = rounds[rounds.length - 1];
-    if (!isCleanRound2(last) && !/Settled by the user:/.test(last.text)) {
-      failures.push(`The re-review loop did not finish: the last round (round ${last.n}) is not clean and is not settled by the user.`);
-    }
-  }
-  return failures;
-}
-
-// Returns { exempt, failures }. Old-format records are exempt, unless `formatRequired` ({ startRaw })
-// says this change must already be in review format 2.
-function evaluateRecord(raw, formatRequired = null) {
+// Returns { failures } for one record's text.
+function evaluateRecord(raw) {
   const text = raw.replace(/\r\n/g, '\n');
-  const marked2 = FORMAT2_MARKER.test(text);
-  const format2 = marked2 || hasFormat2Lines(text);
-  if (formatRequired && !marked2) {
-    return {
-      exempt: false,
-      failures: [`The record is not in review format 2, which is required from ${formatRequired.startRaw} on: its header must carry "- **Review format:** accountability 2" and the fixed re-review lines.`],
-    };
-  }
-  const newFormat = format2 || /^- \*\*Review format:\*\* accountability/m.test(text) || /^\s*\*\*Caused by this change:\*\*/m.test(text);
-  if (!newFormat) return { exempt: true, failures: [] };
   const sections = splitSections(text);
   const failures = [];
+  if (!/^- \*\*Level:\*\*\s*(Light|Full)\b/m.test(text)) failures.push('The record header has no "Level: Light" or "Level: Full" line.');
 
-  const findingsBody = sectionStarting(sections, 'findings') ?? '';
-  const blocks = findingBlocks(findingsBody);
-  for (const b of blocks) failures.push(...judgeFinding(b));
-
-  const trace = traceRows(sectionStarting(sections, 'requirements trace') ?? '');
-  for (const r of trace) if (/^fail/i.test(r.result)) failures.push(`Requirement ${r.id} failed its test.`);
-  const fixedFail = trace.some((r) => /fixed after fail/i.test(r.result));
+  const findingsBody = sectionStarting(sections, 'findings');
+  if (findingsBody === null) failures.push('The record has no Findings section (write "None" if there are none).');
+  for (const b of findingBlocks(findingsBody ?? '')) failures.push(...judgeFinding(b));
 
   const reBody = sectionStarting(sections, 're-review');
-  const rounds = reBody === null ? [] : splitRounds(reBody);
-  if ((blocks.length > 0 || fixedFail) && rounds.length === 0) {
-    failures.push('There are findings (or a fixed failed requirement) but no re-review round is recorded.');
+  const clean = reBody === null ? null : reBody.match(/\*\*Re-review clean:\*\*\s*\**\s*(yes|no)\b/i);
+  if (!clean) failures.push('The record has no "Re-review clean: yes/no" line under a Re-review heading.');
+  else if (clean[1].toLowerCase() === 'no' && !DECIDED.test(reBody)) {
+    failures.push('The re-review was not clean and the record does not say "Decided by: Jason" about what was left.');
   }
-  if (format2) {
-    failures.push(...judgeFormat2Rounds({ blocks, rounds, trace, fixedFail }));
-    return { exempt: false, failures };
+
+  const trace = traceRows(sectionStarting(sections, 'requirements trace') ?? '');
+  if (trace.length === 0) failures.push('The record has no requirements trace.');
+  for (const r of trace) {
+    if (/^fail/i.test(r.result)) failures.push(`Requirement ${r.id} failed its test.`);
+    else if (!/^pass/i.test(r.result)) failures.push(`Requirement ${r.id} has no passing result (it reads "${r.result}").`);
   }
-  if (rounds.length > 0) {
-    const last = rounds[rounds.length - 1];
-    const lastSettled = /Settled by the user:/.test(last.text);
-    if (hasRejection(last.text) && !lastSettled && !statesCleanRound(last.text)) {
-      failures.push(`The last re-review round (round ${last.n}) records a rejection that no later round resolves.`);
-    }
-    if (!isCleanRound(last.text) && !lastSettled) {
-      failures.push(`The re-review loop did not finish: the last round (round ${last.n}) is not clean and is not settled by the user.`);
-    }
-    rounds.forEach((r, idx) => {
-      const settled = /Settled by the user:/.test(r.text);
-      if (idx >= 3 && !settled) {
-        failures.push(`Round ${r.n} is beyond the third and does not carry "Settled by the user:" authorising it.`);
-      }
-      // The re-reviewer's verdict on the outcomes it checked has to be written down in every round.
-      // (The records word the verdict in several ways: accepted, resolved, confirmed, verified.)
-      if (!settled && !/\b(?:accept\w*|resolved|confirm\w*|verified)\b/i.test(r.text)) {
-        failures.push(`Round ${r.n} does not say whether the re-reviewer accepted the outcomes it checked.`);
-      }
-    });
-  }
-  return { exempt: false, failures };
+  return { failures };
 }
 
-// Finds a change's review record: in a git revision, or (rev === null) in the working tree.
-function findRecord(number, rev) {
-  const isRecord = (name) => name.startsWith(`${number}-`) && name.endsWith('.md') && !name.endsWith('-before.md');
-  let names;
-  if (rev) {
-    const out = git(['ls-tree', '--name-only', rev, `${RECORDS_DIR}/`]);
-    names = out.split('\n').filter(Boolean).map((p) => p.slice(RECORDS_DIR.length + 1));
-  } else {
-    names = fs.existsSync(RECORDS_DIR) ? fs.readdirSync(RECORDS_DIR) : [];
-  }
-  const found = names.filter(isRecord);
+// Every file under a directory (recursive), in a git revision or (rev === null) the working tree.
+function listFiles(dir, rev) {
+  if (rev) return (gitTry(['ls-tree', '-r', '--name-only', rev, `${dir}/`]) ?? '').split('\n').filter(Boolean);
+  const out = [];
+  const walk = (d) => {
+    if (!fs.existsSync(d)) return;
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = `${d}/${e.name}`;
+      if (e.isDirectory()) walk(p); else out.push(p);
+    }
+  };
+  walk(dir);
+  return out;
+}
+
+function readFileAt(file, rev) {
+  return rev ? git(['show', `${rev}:${file}`]) : fs.readFileSync(file, 'utf8');
+}
+
+// Finds a change's (or ticket's) review record: docs/reviews/<number>-*.md, not a before-copy. When
+// more than one matches, the one with the same file name as the plan is the record.
+function findRecord(number, files, rev) {
+  const found = files.filter((f) => f.startsWith(`${RECORDS_DIR}/${number}-`) && f.endsWith('.md') && !f.endsWith('-before.md') && !f.slice(RECORDS_DIR.length + 1).includes('/'));
   if (found.length === 0) return { missing: true };
+  let pick = found;
   if (found.length > 1) {
-    const plans = rev
-      ? git(['ls-tree', '--name-only', rev, 'docs/plans/']).split('\n').filter(Boolean).map((p) => p.slice('docs/plans/'.length))
-      : (fs.existsSync('docs/plans') ? fs.readdirSync('docs/plans') : []);
-    const match = found.filter((n) => plans.includes(n));
-    if (match.length !== 1) return { ambiguous: found };
-    found.splice(0, found.length, match[0]);
+    const plans = listFiles('docs/plans', rev).map((f) => f.slice('docs/plans/'.length));
+    pick = found.filter((f) => plans.includes(f.slice(RECORDS_DIR.length + 1)));
+    if (pick.length !== 1) return { ambiguous: found.map((f) => f.slice(RECORDS_DIR.length + 1)) };
   }
-  const file = `${RECORDS_DIR}/${found[0]}`;
-  if (rev && git(['cat-file', '-t', `${rev}:${file}`]).trim() !== 'blob') throw new Error(`${file} is not a readable file`);
-  const text = rev ? git(['show', `${rev}:${file}`]) : fs.readFileSync(file, 'utf8');
-  return { file, text };
+  return { file: pick[0], text: readFileAt(pick[0], rev) };
 }
 
-// `cfg` is the lock's settings (readConfig); a change numbered at or above its "Review format 2
-// required from" number must have a record in review format 2.
-function gateFor(number, rev, cfg = null) {
-  const rec = findRecord(number, rev);
-  if (rec.missing) return { exempt: false, failures: [`${number} has no review record in ${RECORDS_DIR}/.`] };
-  if (rec.ambiguous) return { exempt: false, failures: [`${number} has more than one review record (${rec.ambiguous.join(', ')}) and none matches its plan.`] };
-  const n = number.match(/-(\d+)$/);
-  const required = cfg && cfg.format2From !== null && n && parseInt(n[1], 10) >= cfg.format2From;
-  return evaluateRecord(rec.text, required ? { startRaw: cfg.format2Raw } : null);
+function recordFailures(number, files, rev) {
+  const rec = findRecord(number, files, rev);
+  if (rec.missing) return [`${number} has no review record in ${RECORDS_DIR}/.`];
+  if (rec.ambiguous) return [`${number} has more than one review record (${rec.ambiguous.join(', ')}) and none matches its plan.`];
+  return evaluateRecord(rec.text).failures;
+}
+
+// The gate for one change: its own record, plus the record of every ticket its plan folder holds
+// (docs/plans/<number>-<title>/<number>.<n>-*.md) and of any ticket named in `extraTickets`.
+// A ticket number gates only that ticket.
+function gateFor(number, rev, extraTickets = []) {
+  const files = listFiles(RECORDS_DIR, rev);
+  const failures = recordFailures(number, files, rev);
+  if (/\.\d+$/.test(number)) return { failures };
+  const tickets = new Set(extraTickets);
+  const re = new RegExp(`^docs/plans/${esc(number)}-[^/]+/(${esc(number)}\\.\\d+)-`);
+  for (const f of listFiles('docs/plans', rev)) {
+    const m = f.match(re);
+    if (m) tickets.add(m[1]);
+  }
+  for (const t of [...tickets].sort()) {
+    for (const f of recordFailures(t, files, rev)) failures.push(`Ticket ${t}: ${f}`);
+  }
+  return { failures };
 }
 
 // ---------------------------------------------------------------- hook mode
@@ -407,7 +254,7 @@ function refuse(branch, problems) {
     `The trunk lock refused this update to '${branch}'. ${problems.length === 1 ? 'Problem' : 'Problems'}:`,
     ...problems.map((p) => `  - ${p}`),
     '',
-    'A change only reaches the default branch through /commit-change, once its review record passes the gate.',
+    'A change only reaches the default branch through /merge-change, once its review record passes the gate.',
     'To continue a change that failed the gate, run /code-change on its branch. If the lock itself is broken,',
     'CLAUDE.md explains how the user can turn it off by hand.',
   ];
@@ -422,9 +269,10 @@ function checkRange(oldTip, newTip, cfg) {
     return { hash, parents: parents.split(' ').filter(Boolean), subject: subject ?? '' };
   });
   const releaseRe = /^chore\(release\): v\d+\.\d+\.\d+$/;
-  const numberRe = new RegExp(`^[a-z]+\\(${esc(cfg.prefix)}-(\\d{3,})\\)!?: `);
+  const numberRe = new RegExp(`^[a-z]+\\(${esc(cfg.prefix)}-(\\d{3,})(?:\\.(\\d+))?\\)!?: `);
   const allowed = new Set([...cfg.versionFiles, 'CHANGELOG.md']);
   const numbers = new Set();
+  const tickets = new Map(); // whole number -> the ticket numbers seen under it
   for (const c of commits) {
     const short = c.hash.slice(0, 7);
     if (releaseRe.test(c.subject) && c.parents.length > 0) {
@@ -438,12 +286,19 @@ function checkRange(oldTip, newTip, cfg) {
       problems.push(`Commit ${short} ("${c.subject}") carries no ${cfg.prefix} change number and is not a release commit.`);
       continue;
     }
-    numbers.add(parseInt(m[1], 10));
+    const whole = parseInt(m[1], 10);
+    if (m[2] !== undefined) {
+      // Only a whole number is a check-in: the update may not end on a ticket's own commit.
+      if (c === commits[0]) problems.push(`The update ends with a commit for ticket ${cfg.prefix}-${m[1]}.${m[2]}; only a whole change number is checked in.`);
+      if (!tickets.has(whole)) tickets.set(whole, new Set());
+      tickets.get(whole).add(`${cfg.prefix}-${m[1]}.${m[2]}`);
+    }
+    numbers.add(whole);
   }
   for (const n of [...numbers].sort((a, b) => a - b)) {
     if (n < cfg.start) continue;
     const id = `${cfg.prefix}-${String(n).padStart(3, '0')}`;
-    const result = gateFor(id, newTip, cfg);
+    const result = gateFor(id, newTip, [...(tickets.get(n) ?? [])]);
     for (const f of result.failures) problems.push(`${id}: ${f}`);
   }
   return problems;
@@ -480,11 +335,6 @@ function loosenedSettings(before, after) {
   if (after.defaultBranch !== before.defaultBranch) changed.push('the default branch');
   if (after.prefix !== before.prefix) changed.push('the change prefix');
   if (after.start > before.start) changed.push('the starting number (raised)');
-  // Adding the format 2 line (before has none) or lowering its number only tightens the lock.
-  if (before.format2From !== null) {
-    if (after.format2From === null) changed.push('the review format 2 requirement (removed)');
-    else if (after.format2From > before.format2From) changed.push('the review format 2 requirement (raised)');
-  }
   const added = after.versionFiles.filter((f) => !before.versionFiles.includes(f));
   if (added.length > 0) changed.push(`the version files (added ${added.join(', ')})`);
   return changed;
@@ -556,25 +406,19 @@ function gateMode(args) {
   if (!number) throw new Error('usage: gate <change number> [--rev <revision>]');
   const ri = args.indexOf('--rev');
   const rev = ri >= 0 ? args[ri + 1] : null;
-  // Whether this change must already be in review format 2 depends on CLAUDE.md's settings, so the gate
-  // reads them and fails closed when they are unreadable (it used to need no settings). The settings come
-  // from the same revision (or the working tree) as the record; the hook uses the old tip's instead, which
-  // is what lets the change that adds the "Review format 2 required from" line pass its own check-in.
+  // The prefix comes from CLAUDE.md in the same revision (or the working tree) as the record, and
+  // the gate fails closed when the settings are unreadable.
   const claudeMd = rev ? gitTry(['show', `${rev}:CLAUDE.md`]) : (fs.existsSync('CLAUDE.md') ? fs.readFileSync('CLAUDE.md', 'utf8') : null);
   const cfg = readConfig(claudeMd);
   if (!cfg.ok) {
     process.stdout.write(`Review gate for ${number}: FAILED\n${cfg.problems.map((p) => `  - The lock's settings are incomplete: ${p}.`).join('\n')}\n`);
     return 1;
   }
-  if (!new RegExp(`^${esc(cfg.prefix)}-\\d{3,}$`).test(number)) {
-    process.stdout.write(`Review gate for ${number}: FAILED\n  - ${number} is not a change number with the prefix ${cfg.prefix}.\n`);
+  if (!new RegExp(`^${esc(cfg.prefix)}-\\d{3,}(?:\\.\\d+)?$`).test(number)) {
+    process.stdout.write(`Review gate for ${number}: FAILED\n  - ${number} is not a change or ticket number with the prefix ${cfg.prefix}.\n`);
     return 1;
   }
-  const result = gateFor(number, rev, cfg);
-  if (result.exempt) {
-    process.stdout.write(`Review gate for ${number}: the record is in the old format, so the gate does not apply.\n`);
-    return 0;
-  }
+  const result = gateFor(number, rev);
   if (result.failures.length === 0) {
     process.stdout.write(`Review gate for ${number}: passed.\n`);
     return 0;

@@ -1,634 +1,133 @@
 #!/bin/bash
-# Tests for the trunk lock. Run: bash .githooks/test-trunk-lock.sh
-# Builds throwaway repos in a temp dir, copies the lock's files into each, switches the
-# lock on and drives real git commands against it (merges, fast-forwards, plain commits,
-# cherry-picks, --no-verify, fetches, tags). Each case says whether the update to the
-# default branch must be allowed or refused; a refusal must also leave the branch where
-# it was and print the stated words. Exits non-zero if any case fails.
+# Tests for the trunk lock. Run: bash githooks/test-trunk-lock.sh
+# Builds throwaway repos in a temp dir, switches the lock on in each, and checks the gate on one
+# review record (broken one way at a time) and real check-in merges against the hook. Exits non-zero
+# if any case fails.
 
 here="$(cd "$(dirname "$0")" && pwd)"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-checker="$here/trunk-lock-check.mjs"
-
 pass=0; fail=0
-r=""; def=master; pfx=ABC
-lockname=Master   # the label new_repo gives the lock lines in CLAUDE.md; Master is the pre-rename name
-
+r=""
 g() { git -C "$r" "$@"; }
+check_lock() { node "$r/githooks/trunk-lock-check.mjs" "$@"; }
 
-# new_repo <name> [prefix] [default branch] [start number] [omit: prefix|lock|version|badlock|claude] [review format 2 start number]
-# A repo whose first commit predates the lock being switched on, like a real project.
+# ok <name>, bad <name> <words>: run the command in "$@" after them and compare.
+expect() { # expect <exit code> <words or ""> <name> <command...>
+  local want=$1 words=$2 name=$3; shift 3
+  local out; out=$("$@" 2>&1); local got=$?
+  if { [ "$got" -eq "$want" ] || { [ "$want" -eq 1 ] && [ "$got" -ne 0 ]; }; } && { [ -z "$words" ] || [[ "$out" == *"$words"* ]]; }; then pass=$((pass+1))
+  else fail=$((fail+1)); echo "FAIL: $name (exit $got, wanted $want${words:+, words \"$words\"})"; echo "$out" | head -5; fi
+}
+
 new_repo() {
-  local name=$1 p=${2:-ABC} d=${3:-master} s=${4:-010} omit=${5:-} f2=${6:-}   # omit: prefix|lock|version|badlock|claude
-  r="$tmp/$name"; def=$d; pfx=$p
-  git init -q -b "$d" "$r"
-  mkdir -p "$r/.githooks" "$r/docs/reviews"
-  cp "$here/trunk-lock-check.mjs" "$here/reference-transaction" "$here/install-trunk-lock.sh" "$r/.githooks/"
-  chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-trunk-lock.sh"
-  {
-    printf -- '- **Default branch:** `%s`\n' "$d"
-    [ "$omit" = prefix ] || printf -- '- **Change prefix:** `%s`\n' "$p"
-    [ "$omit" = version ] || printf -- '- **Version files:** `package.json`, `app/version.txt`. Lockfiles are regenerated.\n'
-    if [ "$omit" = badlock ]; then printf -- '- **%s lock starts at:** `%s-1x`\n' "$lockname" "$p"
-    elif [ "$omit" != lock ]; then printf -- '- **%s lock starts at:** `%s-%s`\n' "$lockname" "$p" "$s"; fi
-    [ -z "$f2" ] || printf -- '- **Review format 2 required from:** `%s-%s`\n' "$p" "$f2"
-  } > "$r/CLAUDE.md"
-  [ "$omit" != claude ] || rm "$r/CLAUDE.md"
-  printf '{}\n' > "$r/package.json"; mkdir -p "$r/app" "$r/src"; printf '1\n' > "$r/app/version.txt"
-  printf '# Changelog\n' > "$r/CHANGELOG.md"
-  g add -A
-  g update-index --chmod=+x .githooks/reference-transaction .githooks/install-trunk-lock.sh
-  g commit -q -m "chore($p-001): init"
-  g config core.hooksPath .githooks
+  r="$tmp/$1"
+  git init -q -b trunk "$r"
+  mkdir -p "$r/githooks" "$r/docs/reviews" "$r/docs/plans"
+  cp "$here/trunk-lock-check.mjs" "$here/reference-transaction" "$r/githooks/"
+  chmod +x "$r/githooks/reference-transaction"
+  printf -- '- **Default branch:** `trunk`\n- **Change prefix:** `PWF`\n- **Version files:** `package.json`\n- **Trunk lock starts at:** `PWF-010`\n' > "$r/CLAUDE.md"
+  printf '{}\n' > "$r/package.json"; printf '# Changelog\n' > "$r/CHANGELOG.md"
+  g add -A; g update-index --chmod=+x githooks/reference-transaction
+  g commit -q -m "chore(PWF-001): init"
+  g config core.hooksPath githooks
 }
 
-# mk_record <number> <variant>: a review record in the new format, broken in one way.
-mk_record() {
-  local n=$1 v=$2 result=Pass
-  local finding="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** fixed (how)"
-  local rereview="## Re-review
-
-### Round 1
-It accepted every fix and raised no new finding. Round clean: yes.
-"
-  case $v in
+# record <variant>: a record in the one format, broken in one way.
+record() {
+  local finding='- **[Low]** a thing — f.js
+  **Caused by this change:** no
+  **Recommendation:** none
+  **Outcome:** fixed (how)
+  **Re-review:** accepted'
+  local level='Full' clean='yes' row='| R1 | a test | Pass |' findings
+  case $1 in
     ok) ;;
-    nofindings) finding=""; rereview="" ;;
-    nolabel) finding="- **[Low]** a thing — f.js
-  **Disposition:** fixed (how)" ;;
-    logged) finding="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** logged in docs/BACKLOG.md" ;;
-    settled) finding="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** logged in docs/BACKLOG.md
-  **Settled by the user:** \"fine as it is\"" ;;
-    blankline) finding="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-
-  **Disposition:** fixed (how)" ;;
-    plainbullet) finding="- a thing — f.js
-  **Disposition:** fixed (how)" ;;
-    noaccept) rereview="## Re-review
-
-### Round 1
-Looked at it. Round clean: yes.
-" ;;
-    norereview) rereview="" ;;
-    rejected) rereview="## Re-review
-
-### Round 1
-The re-reviewer rejected the fix.
-" ;;
-    cleanmention) rereview="## Re-review
-
-### Round 1
-The re-reviewer first rejected the fix; the author reworked it and the re-reviewer then accepted it. Round clean: yes.
-" ;;
-    rejectedunclean) rereview="## Re-review
-
-### Round 1
-The re-reviewer rejected the fix. Round clean: no.
-" ;;
-    unclean) rereview="## Re-review
-
-### Round 1
-It raised a new finding. Round clean: no.
-" ;;
-    round4) rereview="## Re-review
-
-### Round 1
-New finding. Round clean: no.
-
-### Round 2
-New finding. Round clean: no.
-
-### Round 3
-New finding. Round clean: no.
-
-### Round 4
-Round clean: yes.
-" ;;
-    failrow) result=Fail ;;
+    nolevel) level='' ;;
+    nooutcome) finding=${finding/'**Outcome:** fixed (how)'/} ;;
+    noreview) finding=${finding/'**Re-review:** accepted'/} ;;
+    rejected) finding=${finding/accepted/rejected} ;;
+    rejected-decided) finding=${finding/accepted/rejected$'\n'  '**Decided by:** Jason'} ;;
+    jason-undecided) finding=${finding/'fixed (how)'/'accepted by Jason'}; finding=${finding/'**Re-review:** accepted'/} ;;
+    caused-backlog) finding=${finding/'**Caused by this change:** no'/'**Caused by this change:** yes'}; finding=${finding/'fixed (how)'/'moved to backlog'}; finding=${finding/'**Re-review:** accepted'/} ;;
+    notclean) clean='no' ;;
+    notclean-decided) clean='no
+**Decided by:** Jason' ;;
+    fail) row='| R1 | a test | Fail |' ;;
+    manual) row='| R1 | a test | Manual |' ;;
+    none) finding='None' ;;
   esac
-  printf '# Review: %s — t\n\n- **Change:** %s\n- **Review format:** accountability\n- **Plan:** x\n\n## Findings\n\n%s\n\n%s\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n| R1 | t | %s |\n' \
-    "$n" "$n" "$finding" "$rereview" "$result"
+  [ "$level" = '' ] && level_line='' || level_line="- **Level:** $level"
+  printf '# Review: x\n- **Change:** x\n%s\n\n## Findings\n%s\n\n## Re-review\n**Re-review clean:** %s\n\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n%s\n\n## Summary\nx\n' "$level_line" "$finding" "$clean" "$row"
 }
 
-# mk_record2 <number> <variant>: a review record in review format 2 (the fixed re-review lines),
-# broken in one way. The variant "oldmarker" keeps the lines but writes the old header marker.
-mk_record2() {
-  local n=$1 v=$2 marker="accountability 2" trace=Pass
-  local f1="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** fixed (how)
-  **Re-review (round 1):** accepted"
-  local f2=""
-  local rereview="## Re-review
+# --- the gate on one record
+new_repo gate
+n=PWF-031
+put() { mkdir -p "$r/docs/reviews"; record "$1" > "$r/docs/reviews/$n-x.md"; }
+gate() { (cd "$r" && node githooks/trunk-lock-check.mjs gate "${1:-$n}"); }
+put ok;               expect 0 "passed" "a complete record passes" gate
+put none;             expect 0 "passed" "no findings passes" gate
+put nolevel;          expect 1 "Level" "a missing level fails" gate
+put nooutcome;        expect 1 "no outcome" "a finding without an outcome fails" gate
+put noreview;         expect 1 "Re-review: accepted/rejected" "a fixed finding without a re-review line fails" gate
+put rejected;         expect 1 "Decided by: Jason" "a rejection without Jason's decision fails" gate
+put rejected-decided; expect 0 "passed" "a rejection decided by Jason passes" gate
+put jason-undecided;  expect 1 "Decided by: Jason" "accepted by Jason without the decision line fails" gate
+put caused-backlog;   expect 1 "moved to the backlog" "a caused finding moved to the backlog fails" gate
+put notclean;         expect 1 "not clean" "a re-review that is not clean fails" gate
+put notclean-decided; expect 0 "passed" "a not-clean re-review decided by Jason passes" gate
+put fail;             expect 1 "failed its test" "a failed requirement fails" gate
+put manual;           expect 1 "no passing result" "a manual requirement not yet run fails" gate
+rm "$r/docs/reviews/$n-x.md"; expect 1 "no review record" "a missing record fails" gate
+expect 1 "not a change or ticket number" "another prefix fails" gate ABC-031
 
-### Round 1
-Checked the fix. **Round 1 clean:** yes
-"
-  case $v in
-    ok) ;;
-    nofindings) f1=""; rereview="" ;;
-    noverdict) f1="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** fixed (how)" ;;
-    rejected) f1="${f1/accepted/rejected}"
-      rereview="## Re-review
+# --- ticket numbers
+record ok > "$r/docs/reviews/$n.1-t.md"
+expect 0 "passed" "a ticket number is accepted" gate "$n.1"
+mkdir -p "$r/docs/plans/$n-big"; : > "$r/docs/plans/$n-big/$n.1-t.md"; : > "$r/docs/plans/$n-big/$n.2-u.md"
+record ok > "$r/docs/reviews/$n-big.md"
+expect 1 "Ticket $n.2" "a change fails while a ticket has no record" gate
+record ok > "$r/docs/reviews/$n.2-u.md"
+expect 0 "passed" "a change passes once every ticket record passes" gate
 
-### Round 1
-**Round 1 clean:** no
-" ;;
-    rejthenacc) f1="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** fixed (how)
-  **Re-review (round 1):** rejected
-  **Re-review (round 2):** accepted"
-      rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** no
-
-### Round 2
-**Round 2 clean:** yes
-" ;;
-    cleanwithrej) f1="${f1/accepted/rejected}" ;;
-    cleanwithnew) f2="- **[Low]** another thing — g.js
-  **Caused by this change:** yes
-  **Raised in round:** 1
-  **Disposition:** fixed (how)
-  **Re-review (round 2):** accepted"
-      rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** yes
-
-### Round 2
-**Round 2 clean:** yes
-" ;;
-    verdictbeforeraised) f2="- **[Low]** another thing — g.js
-  **Caused by this change:** yes
-  **Raised in round:** 2
-  **Disposition:** fixed (how)
-  **Re-review (round 2):** accepted"
-      rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** no
-
-### Round 2
-**Round 2 clean:** no
-
-### Round 3
-**Round 3 clean:** yes
-" ;;
-    notclean) rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** no
-" ;;
-    noroundline) rereview="## Re-review
-
-### Round 1
-It accepted every fix and raised no new finding.
-" ;;
-    settledunclean) rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** no
-**Settled by the user:** \"fine as it is\"
-" ;;
-    settledfinding) f1="- **[Low]** a thing — f.js
-  **Caused by this change:** yes
-  **Disposition:** logged in docs/BACKLOG.md
-  **Settled by the user:** \"fine as it is\"" ;;
-    unknownround) f1="${f1/round 1/round 7}" ;;
-    norereview) rereview="" ;;
-    round4) rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** no
-
-### Round 2
-**Round 2 clean:** no
-
-### Round 3
-**Round 3 clean:** no
-
-### Round 4
-**Round 4 clean:** yes
-" ;;
-    failfixed) f1=""; trace="Pass (fixed after Fail)"
-      rereview="## Re-review
-
-### Round 1
-**Re-review (round 1):** R1 accepted
-**Round 1 clean:** yes
-" ;;
-    dupclean) rereview="## Re-review
-
-### Round 1
-**Round 1 clean:** yes
-**Round 1 clean:** yes
-" ;;
-    failfixedcolon) f1=""; trace="Pass (fixed after Fail)"
-      rereview="## Re-review
-
-### Round 1
-**Re-review (round 1):** R1: accepted
-**Round 1 clean:** yes
-" ;;
-    failfixedrej) f1=""; trace="Pass (fixed after Fail)"
-      rereview="## Re-review
-
-### Round 1
-**Re-review (round 1):** R1 rejected
-**Round 1 clean:** no
-" ;;
-    failfixednoline) f1=""; trace="Pass (fixed after Fail)"
-      rereview="## Re-review
-
-### Round 1
-Checked the fix. **Round 1 clean:** yes
-" ;;
-    oldmarker) marker=accountability; f1="${f1/\*\*Re-review (round 1):\*\* accepted/}" ;;
-    nomarker) marker=none; f1="${f1/\*\*Re-review (round 1):\*\* accepted/}" ;;
-  esac
-  [ "$v" != nomarker ] || { printf '# Review: %s — t\n\n- **Change:** %s\n- **Plan:** x\n\n## Findings\n\n%s\n\n%s\n\n%s\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n| R1 | t | %s |\n' "$n" "$n" "$f1" "$f2" "$rereview" "$trace"; return; }
-  printf '# Review: %s — t\n\n- **Change:** %s\n- **Review format:** %s\n- **Plan:** x\n\n## Findings\n\n%s\n\n%s\n\n%s\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n| R1 | t | %s |\n' \
-    "$n" "$n" "$marker" "$f1" "$f2" "$rereview" "$trace"
+# --- the hook on real check-ins
+checkin() { # checkin <variant> <branch> : branch off trunk with a plan, record and a numbered commit
+  g switch -q -c "$2" trunk
+  put "$1"; printf 'x\n' > "$r/f.txt"
+  g add -A; g commit -q -m "feat($n): thing"
+  g switch -q trunk
 }
+new_repo hook
+expect 1 "refused" "a plain commit on trunk is refused" bash -c "cd '$r' && echo y > a && git add a && git commit -q -m 'feat($n): direct'"
+checkin ok c1;      expect 0 "" "a check-in with a passing record is allowed" g merge -q --no-ff c1 -m "feat($n): thing"
+g reset -q --hard HEAD 2>/dev/null
+new_repo hook2; n=PWF-032
+checkin fail c2;    before=$(g rev-parse trunk)
+expect 1 "failed its test" "a check-in with a failing record is refused" g merge -q --no-ff c2 -m "feat($n): thing"
+[ "$(g rev-parse trunk)" = "$before" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a refused check-in must leave trunk where it was"; }
+g merge --abort 2>/dev/null; g reset -q --hard "$before" 2>/dev/null
+g switch -q -c c3 trunk; printf 'y\n' > "$r/h.txt"; g add -A; g commit -q -m "no number here"; g switch -q trunk
+expect 1 "carries no PWF change number" "a commit without a change number is refused" g merge -q --no-ff c3 -m "feat($n): thing"
+g merge --abort 2>/dev/null; g reset -q --hard "$before" 2>/dev/null
 
-# put_record <number> <variant|old>: writes the record into the working tree and stages it.
-# A variant written "v2:<name>" is a review format 2 record (mk_record2).
-put_record() {
-  mkdir -p "$r/docs/reviews"
-  if [ "$2" = old ]; then printf '# Review: %s\n\nOld style record, no accountability marker.\n' "$1" > "$r/docs/reviews/$1-x.md"
-  elif [ "${2#v2:}" != "$2" ]; then mk_record2 "$1" "${2#v2:}" > "$r/docs/reviews/$1-x.md"
-  else mk_record "$1" "$2" > "$r/docs/reviews/$1-x.md"; fi
-  g add -A
-}
+# --- a large change: tickets inside a whole-number check-in
+new_repo big; n=PWF-033
+mkdir -p "$r/docs/plans/$n-big"; : > "$r/docs/plans/$n-big/$n.1-t.md"
+g switch -q -c integ trunk
+put ok; record ok > "$r/docs/reviews/$n.1-t.md"; printf 'x\n' > "$r/f.txt"
+g add -A; g commit -q -m "docs($n): approved spec"
+g switch -q -c tick integ; printf 'z\n' > "$r/t.txt"; g add -A; g commit -q -m "feat($n.1): ticket work"
+g switch -q integ; g merge -q --no-ff tick -m "chore($n.1): merge ticket"; g switch -q trunk
+g merge -q --no-ff integ -m "feat($n): big thing" 2>/dev/null
+expect 0 "" "a large change checks in under its whole number" g rev-parse --verify -q trunk
+expect 0 "" "(its tickets were merged inside it)" bash -c "cd '$r' && git log --format=%s trunk | grep -q 'ticket work'"
+new_repo big2; n=PWF-034
+g switch -q -c tick2 trunk; put ok; printf 'z\n' > "$r/t.txt"; g add -A; g commit -q -m "feat($n.1): ticket only"
+g switch -q trunk
+expect 1 "only a whole change number" "a ticket's own commit as the tip of trunk is refused" g merge -q --ff-only tick2
 
-# commit_with <number> <variant|old|none> <message> [git commit flags]   (none: no record at all)
-commit_with() {
-  local n=$1 v=$2 msg=$3; shift 3
-  [ "$v" = none ] || put_record "$n" "$v"
-  g commit -q --allow-empty "$@" -m "$msg"
-}
-
-# attempt <name> <ok|refused> <words the output must contain, or ''> <command...>
-attempt() {
-  local name=$1 want=$2 pat=$3; shift 3
-  local before after code out
-  before=$(g rev-parse "$def" 2>/dev/null)
-  out=$("$@" 2>&1); code=$?
-  after=$(g rev-parse "$def" 2>/dev/null)
-  if [ "$want" = refused ]; then g merge --abort >/dev/null 2>&1; g reset -q --hard >/dev/null 2>&1; fi
-  if [ "$want" = ok ]; then
-    if [ $code -eq 0 ]; then pass=$((pass+1)); echo "PASS  $name"
-    else fail=$((fail+1)); echo "FAIL  $name (wanted it allowed, got exit $code): $out"; fi
-  else
-    if [ $code -ne 0 ] && [ "$before" = "$after" ] && { [ -z "$pat" ] || printf '%s' "$out" | grep -qF -- "$pat"; }; then
-      pass=$((pass+1)); echo "PASS  $name"
-    else
-      fail=$((fail+1)); echo "FAIL  $name (wanted it refused with \"$pat\"; exit $code, branch moved: $([ "$before" = "$after" ] && echo no || echo YES)): $out"
-    fi
-  fi
-}
-
-# check <name> <expected exit> <words the output must contain, or ''> <command...>
-check() {
-  local name=$1 want=$2 pat=$3; shift 3
-  local out code
-  out=$("$@" 2>&1); code=$?
-  if [ "$code" = "$want" ] && { [ -z "$pat" ] || printf '%s' "$out" | grep -qF -- "$pat"; }; then pass=$((pass+1)); echo "PASS  $name"
-  else fail=$((fail+1)); echo "FAIL  $name (wanted exit $want with \"$pat\", got $code): $out"; fi
-}
-
-# on_branch <branch> <number> <variant> <message>: a branch off the default with one numbered commit.
-on_branch() {
-  g switch -q "$def"
-  g switch -q -c "$1"
-  commit_with "$2" "$3" "$4"
-}
-
-status_in() { ( cd "$r" && node .githooks/trunk-lock-check.mjs status ); }
-
-echo "== R1: every route onto the default branch is allowed when the records pass"
-new_repo r1
-on_branch work-merge ABC-020 ok "feat(ABC-020): work"; g switch -q master
-attempt "no-ff merge of a change with a passing record" ok "" g merge --no-ff -q work-merge -m "feat(ABC-020): merge"
-on_branch work-ff ABC-021 ok "feat(ABC-021): work"; g switch -q master
-attempt "fast-forward merge" ok "" g merge --ff-only -q work-ff
-on_branch work-pick ABC-022 ok "feat(ABC-022): work"; pick=$(g rev-parse HEAD); g switch -q master
-attempt "cherry-pick" ok "" g cherry-pick "$pick"
-attempt "plain commit" ok "" commit_with ABC-023 ok "feat(ABC-023): direct"
-attempt "plain commit with --no-verify" ok "" commit_with ABC-024 ok "feat(ABC-024): direct" --no-verify
-attempt "a change with no findings at all" ok "" commit_with ABC-025 nofindings "feat(ABC-025): direct"
-echo "== R1: --no-verify and other routes do not get round the lock"
-attempt "--no-verify commit with a failing record" refused "ABC-026" commit_with ABC-026 failrow "feat(ABC-026): x" --no-verify
-g reset -q --hard
-on_branch work-bad ABC-027 failrow "feat(ABC-027): work"; g switch -q master
-attempt "fast-forward of a failing change" refused "ABC-027" g merge --ff-only -q work-bad
-attempt "no-ff merge of a failing change" refused "ABC-027" g merge --no-ff -q work-bad -m "feat(ABC-027): merge"
-g merge --abort 2>/dev/null; g reset -q --hard
-
-echo "== R2: no review record"
-new_repo r2
-attempt "a change at the starting number with no record" refused "ABC-010 has no review record" commit_with ABC-010 none "feat(ABC-010): x"
-attempt "a change above the starting number with no record" refused "ABC-022 has no review record" commit_with ABC-022 none "feat(ABC-022): x"
-
-echo "== R3: each broken gate rule is refused, with the rule in the message"
-new_repo r3
-attempt "missing caused label" refused 'no "Caused by this change' commit_with ABC-030 nolabel "feat(ABC-030): x"
-attempt "caused finding logged" refused "logged instead of fixed or explained" commit_with ABC-031 logged "feat(ABC-031): x"
-attempt "findings but no re-review" refused "no re-review round is recorded" commit_with ABC-032 norereview "feat(ABC-032): x"
-attempt "re-reviewer rejection left standing" refused "records a rejection" commit_with ABC-033 rejected "feat(ABC-033): x"
-attempt "a clean last round that mentions an earlier rejection that was then accepted" ok "" commit_with ABC-042 cleanmention "feat(ABC-042): x"
-attempt "a rejection in a last round that is not clean" refused "records a rejection" commit_with ABC-043 rejectedunclean "feat(ABC-043): x"
-attempt "last round not clean" refused "did not finish" commit_with ABC-034 unclean "feat(ABC-034): x"
-attempt "fourth round not authorised" refused "beyond the third" commit_with ABC-035 round4 "feat(ABC-035): x"
-attempt "failed requirement" refused "failed its test" commit_with ABC-036 failrow "feat(ABC-036): x"
-attempt "caused finding logged but settled by the user" ok "" commit_with ABC-037 settled "feat(ABC-037): x"
-attempt "a clean record" ok "" commit_with ABC-038 ok "feat(ABC-038): x"
-attempt "a round that does not record the re-reviewer's verdict" refused "does not say whether the re-reviewer accepted" commit_with ABC-039 noaccept "feat(ABC-039): x"
-attempt "a finding written without the severity form" refused "has no severity" commit_with ABC-040 plainbullet "feat(ABC-040): x"
-attempt "a blank line inside a finding" ok "" commit_with ABC-041 blankline "feat(ABC-041): x"
-
-echo "== R4: commits with no usable change number"
-new_repo r4
-attempt "no number at all" refused "carries no ABC change number" commit_with x none "fix typo"
-attempt "a number with too few digits" refused "carries no ABC change number" commit_with x none "feat(ABC-1): x"
-attempt "another prefix's number" refused "carries no ABC change number" commit_with x none "feat(XYZ-050): x"
-attempt "a number with no scope brackets" refused "carries no ABC change number" commit_with x none "feat: ABC-050 x"
-
-echo "== R5: release commits"
-new_repo r5
-printf '# Changelog\n\n## [1.2.3]\n' > "$r/CHANGELOG.md"; printf '{"v":1}\n' > "$r/package.json"; printf '2\n' > "$r/app/version.txt"; g add -A
-attempt "a release commit touching only the version files and changelog" ok "" g commit -q -m "chore(release): v1.2.3"
-printf 'x\n' > "$r/src/a.txt"; printf '3\n' > "$r/app/version.txt"; g add -A
-attempt "a release commit that also changes other files" refused "src/a.txt" g commit -q -m "chore(release): v1.2.4"
-g reset -q --hard
-printf '# Changelog\n\n## [1.2.5]\n' > "$r/CHANGELOG.md"; g add -A
-attempt "a release-looking commit with the wrong message form" refused "carries no ABC change number" g commit -q -m "chore(release): 1.2.5"
-g reset -q --hard
-g switch -q -c build/v1.2.6
-printf '4\n' > "$r/app/version.txt"; g add -A; g commit -q -m "chore(release): v1.2.6"; g switch -q master
-attempt "a build branch merged with the release message" ok "" g merge --no-ff -q build/v1.2.6 -m "chore(release): v1.2.6"
-
-echo "== R6: old numbers and old-format records are not checked"
-new_repo r6
-attempt "a number below the starting number with no record" ok "" commit_with ABC-009 none "feat(ABC-009): x"
-attempt "an old-format record above the starting number" ok "" commit_with ABC-041 old "feat(ABC-041): x"
-
-echo "== R7: work branches are never checked"
-new_repo r7
-g switch -q -c work
-attempt "a numbered commit with a failing record on a work branch" ok "" commit_with ABC-050 failrow "feat(ABC-050): x"
-attempt "an unnumbered commit on a work branch" ok "" commit_with x none "wip"
-g switch -q master; commit_with ABC-051 ok "feat(ABC-051): other"; g switch -q work
-attempt "merging the default branch into a work branch with git's own message" ok "" g merge -q master -m "Merge branch 'master' into work"
-attempt "creating and deleting branches" ok "" bash -c "git -C '$r' branch tmp && git -C '$r' branch -D tmp"
-
-echo "== R10: the lock fails closed"
-new_repo r10a ABC master 010 prefix
-attempt "settings missing the change prefix" refused "Change prefix" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10b ABC master 010 lock
-attempt "settings missing the starting number" refused "Master lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10c ABC master 010 version
-attempt "settings missing the version files" refused "Version files" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10d ABC master 010 badlock
-attempt "a starting number that is not a change number" refused "Master lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10e
-mkdir -p "$r/docs/reviews/ABC-060-x.md"; printf 'x\n' > "$r/docs/reviews/ABC-060-x.md/file"; g add -A
-attempt "a review record that cannot be read as a file" refused "could not finish" g commit -q -m "feat(ABC-060): x"
-g reset -q --hard
-new_repo r10f
-printf -- '- **Default branch:** `master`\n' > "$r/CLAUDE.md"; g add -A
-attempt "a change that would strip the lock's settings" refused "without its settings" g commit -q -m "feat(ABC-061): x"
-g reset -q --hard
-new_repo r10g ABC master 010 claude
-g config init.defaultBranch master
-attempt "no CLAUDE.md at all at the current tip" refused "settings cannot be read" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10h
-attempt "deleting the default branch" refused "cannot be deleted" bash -c "git -C '$r' update-ref -d refs/heads/master"
-check "a line the hook cannot read" 2 "refuses" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/trunk-lock-check.mjs hook prepared )"
-check "a state other than prepared is ignored" 0 "" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/trunk-lock-check.mjs hook committed )"
-
-echo "== R10: a check-in cannot loosen the lock's own settings"
-new_repo r10s
-# change_settings <sed expression> <number> <message>: a numbered change with a passing record that also edits CLAUDE.md
-change_settings() { sed -i "$1" "$r/CLAUDE.md"; commit_with "$2" "${cs_variant:-ok}" "$3"; }
-attempt "raising the starting number" refused "starting number (raised)" change_settings 's/ABC-010/ABC-500/' ABC-080 "feat(ABC-080): x"
-attempt "adding a version file" refused "added src/a.txt" change_settings 's/`app\/version.txt`/`app\/version.txt`, `src\/a.txt`/' ABC-081 "feat(ABC-081): x"
-attempt "changing the change prefix" refused "" change_settings 's/`ABC`/`XYZ`/' ABC-082 "feat(ABC-082): x"
-attempt "changing the default branch name" refused "the default branch" change_settings 's/`master`/`trunk`/' ABC-083 "feat(ABC-083): x"
-attempt "lowering the starting number" ok "" change_settings 's/ABC-010/ABC-005/' ABC-084 "feat(ABC-084): x"
-attempt "narrowing the version files" ok "" change_settings 's/`package.json`, //' ABC-085 "feat(ABC-085): x"
-
-echo "== the lock lines are read under either name (Trunk lock, or the older Master lock)"
-lockname=Trunk
-new_repo r10t
-attempt "Trunk label: a change with no record is refused" refused "ABC-020 has no review record" commit_with ABC-020 none "feat(ABC-020): x"
-attempt "Trunk label: a change with a passing record is allowed" ok "" commit_with ABC-021 ok "feat(ABC-021): x"
-check "Trunk label: status says the lock is on" 0 "Trunk lock: ON" status_in
-new_repo r10u ABC master 010 lock
-attempt "Trunk label: a missing starting number is named" refused "Trunk lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
-new_repo r10x ABC master 010 badlock
-attempt "Trunk label: an unreadable starting number is named" refused "Trunk lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
-lockname=Master
-new_repo r10v
-attempt "relabelling Master to Trunk with the same number is allowed" ok "" change_settings 's/Master lock starts at/Trunk lock starts at/' ABC-090 "feat(ABC-090): x"
-check "after the relabel, status says the lock is on" 0 "Trunk lock: ON" status_in
-attempt "after the relabel, a change with no record is still refused" refused "ABC-091 has no review record" commit_with ABC-091 none "feat(ABC-091): x"
-new_repo r10w
-attempt "relabelling and raising the starting number together is refused" refused "starting number (raised)" change_settings 's/Master lock starts at:\*\* `ABC-010`/Trunk lock starts at:** `ABC-500`/' ABC-092 "feat(ABC-092): x"
-
-echo "== R11: the settings come from CLAUDE.md"
-new_repo r11 XYZ trunk 050
-attempt "below the starting number, other prefix" ok "" commit_with XYZ-049 none "feat(XYZ-049): x"
-attempt "at the starting number, other prefix" refused "XYZ-050 has no review record" commit_with XYZ-050 none "feat(XYZ-050): x"
-attempt "this prefix with a passing record" ok "" commit_with XYZ-051 ok "feat(XYZ-051): x"
-attempt "the default prefix is not special" refused "carries no XYZ change number" commit_with ABC-060 none "feat(ABC-060): x"
-g switch -q -c master
-attempt "a branch that happens to be called master is not the default here" ok "" commit_with x none "wip"
-files=$(find "$here" -type f ! -name test-trunk-lock.sh)
-check "no project names in the lock's files" 1 "" grep -nE 'DTP|Disney|tauri|Cargo|package-lock' $files
-check "no hard-coded branch names in the lock's files" 1 "" grep -nE "['\"]master['\"]|['\"]main['\"]|refs/heads/(master|main)" $files
-
-echo "== R12: only the local default branch is guarded"
-new_repo r12
-git init -q --bare "$tmp/r12-remote.git"
-g remote add origin "$tmp/r12-remote.git"
-g push -q origin master
-git clone -q "$tmp/r12-remote.git" "$tmp/r12-other"
-git -C "$tmp/r12-other" -c user.name=t -c user.email=t@t commit -q --allow-empty -m "no number and no record"
-git -C "$tmp/r12-other" push -q origin master
-attempt "a fetch that moves the remote-tracking branch to an unrecorded commit" ok "" g fetch -q origin
-unrecorded=$(g rev-parse origin/master)
-attempt "a tag created on an unrecorded commit" ok "" g tag t1 "$unrecorded"
-attempt "a tag moved to another commit" ok "" g tag -f t1 HEAD
-attempt "a remote-tracking ref set by hand" ok "" g update-ref refs/remotes/origin/zzz "$unrecorded"
-attempt "another branch set to an unrecorded commit" ok "" g update-ref refs/heads/other "$unrecorded"
-attempt "the default branch set to the same unrecorded commit" refused "carries no ABC change number" g update-ref refs/heads/master "$unrecorded"
-attempt "pulling the unrecorded commit into the default branch" refused "carries no ABC change number" g merge --ff-only -q origin/master
-
-echo "== R14: the catch-up merge on a branch needs the change number"
-new_repo r14
-on_branch work-a ABC-070 ok "feat(ABC-070): work"; g switch -q master
-commit_with ABC-071 ok "feat(ABC-071): other change"
-g switch -q work-a
-g merge -q master -m "chore(ABC-070): catch up with master"
-g switch -q master
-attempt "a branch with a numbered catch-up merge" ok "" g merge --no-ff -q work-a -m "feat(ABC-070): merge"
-on_branch work-b ABC-072 ok "feat(ABC-072): work"; g switch -q master
-commit_with ABC-073 ok "feat(ABC-073): other change"
-g switch -q work-b
-g merge -q master --no-edit
-g switch -q master
-attempt "a branch with git's unnumbered catch-up merge" refused "Merge branch 'master' into work-b" g merge --no-ff -q work-b -m "feat(ABC-072): merge"
-g merge --abort 2>/dev/null; g reset -q --hard
-
-echo "== R15: review format 2 records are read by their fixed lines"
-new_repo r15
-attempt "a format 2 record, every verdict accepted and the last round clean" ok "" commit_with ABC-100 v2:ok "feat(ABC-100): x"
-attempt "a format 2 record with no findings and no rounds" ok "" commit_with ABC-101 v2:nofindings "feat(ABC-101): x"
-attempt "a finding with no re-review line" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-102 v2:noverdict "feat(ABC-102): x"
-attempt "a finding whose latest verdict is a rejection" refused "latest re-review verdict is a rejection" commit_with ABC-103 v2:rejected "feat(ABC-103): x"
-attempt "a rejection that a later round accepted" ok "" commit_with ABC-104 v2:rejthenacc "feat(ABC-104): x"
-attempt "a round marked clean that records a rejection" refused "marked clean but records a rejection" commit_with ABC-105 v2:cleanwithrej "feat(ABC-105): x"
-attempt "a round marked clean that raised a new finding" refused "marked clean but raised a new finding" commit_with ABC-106 v2:cleanwithnew "feat(ABC-106): x"
-attempt "a verdict from the round that raised the finding" refused "cannot have checked it" commit_with ABC-107 v2:verdictbeforeraised "feat(ABC-107): x"
-attempt "a last round that says clean: no" refused "did not finish" commit_with ABC-108 v2:notclean "feat(ABC-108): x"
-attempt "a round with no clean line" refused 'has no "Round 1 clean: yes/no" line' commit_with ABC-109 v2:noroundline "feat(ABC-109): x"
-attempt "a round that is not clean but is settled by the user" ok "" commit_with ABC-110 v2:settledunclean "feat(ABC-110): x"
-attempt "a finding settled by the user needs no verdict" ok "" commit_with ABC-111 v2:settledfinding "feat(ABC-111): x"
-attempt "a verdict naming a round that is not recorded" refused "which is not recorded" commit_with ABC-112 v2:unknownround "feat(ABC-112): x"
-attempt "findings but no re-review round" refused "no re-review round is recorded" commit_with ABC-113 v2:norereview "feat(ABC-113): x"
-attempt "a fourth round not authorised" refused "beyond the third" commit_with ABC-114 v2:round4 "feat(ABC-114): x"
-attempt "a fixed failed requirement with its accepted line" ok "" commit_with ABC-115 v2:failfixed "feat(ABC-115): x"
-attempt "a fixed failed requirement whose latest verdict is a rejection" refused "latest re-review verdict is a rejection" commit_with ABC-116 v2:failfixedrej "feat(ABC-116): x"
-attempt "a fixed failed requirement with no line" refused 'no "Re-review (round N): R1 accepted" line' commit_with ABC-117 v2:failfixednoline "feat(ABC-117): x"
-attempt "a fixed failed requirement whose line spells the id with a colon" ok "" commit_with ABC-121 v2:failfixedcolon "feat(ABC-121): x"
-attempt "a round with two clean lines" refused 'it needs exactly one' commit_with ABC-122 v2:dupclean "feat(ABC-122): x"
-put_record ABC-123 v2:ok
-check "the gate command refuses a number with another prefix" 1 "not a change number with the prefix ABC" bash -c "cd '$r' && node .githooks/trunk-lock-check.mjs gate XYZ-123"
-g reset -q --hard
-attempt "fixed lines under the old marker are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-118 v2:oldmarker "feat(ABC-118): x"
-attempt "fixed lines with no marker at all are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-119 v2:nomarker "feat(ABC-119): x"
-attempt "an old-format record keeps its keyword reading" ok "" commit_with ABC-120 cleanmention "feat(ABC-120): x"
-
-echo "== R16: the format 2 requirement"
-new_repo r16 ABC master 010 "" 130
-attempt "below the number, an old-marker record still passes" ok "" commit_with ABC-129 ok "feat(ABC-129): x"
-attempt "below the number, a record with no marker still passes" ok "" commit_with ABC-128 old "feat(ABC-128): x"
-attempt "at the number, an old-marker record is refused" refused "not in review format 2" commit_with ABC-130 ok "feat(ABC-130): x"
-attempt "at the number, a record with no marker is refused" refused "not in review format 2" commit_with ABC-131 old "feat(ABC-131): x"
-attempt "at the number, a record with fixed lines but the old marker is refused" refused "not in review format 2" commit_with ABC-132 v2:oldmarker "feat(ABC-132): x"
-attempt "at the number, a format 2 record passes" ok "" commit_with ABC-133 v2:ok "feat(ABC-133): x"
-attempt "above the number, a format 2 record that breaks a rule is refused" refused "latest re-review verdict is a rejection" commit_with ABC-134 v2:rejected "feat(ABC-134): x"
-put_record ABC-135 ok
-check "the gate command applies the requirement too" 1 "not in review format 2" bash -c "cd '$r' && node .githooks/trunk-lock-check.mjs gate ABC-135"
-g reset -q --hard
-new_repo r16b
-attempt "with no such line in CLAUDE.md no format is required" ok "" commit_with ABC-900 ok "feat(ABC-900): x"
-new_repo r16c
-printf -- '- **Review format 2 required from:**\n' >> "$r/CLAUDE.md"; g add -A
-attempt "a format 2 line with no number fails closed" refused "Review format 2 required from" commit_with ABC-901 v2:ok "feat(ABC-901): x"
-g reset -q --hard
-
-echo "== R17: a check-in cannot raise or remove the format 2 requirement"
-new_repo r17s ABC master 010 "" 130
-cs_variant=v2:ok
-attempt "raising the number" refused "review format 2 requirement (raised)" change_settings 's/ABC-130/ABC-500/' ABC-140 "feat(ABC-140): x"
-attempt "removing the line" refused "review format 2 requirement (removed)" change_settings '/Review format 2 required from/d' ABC-141 "feat(ABC-141): x"
-attempt "lowering the number" ok "" change_settings 's/ABC-130/ABC-120/' ABC-142 "feat(ABC-142): x"
-cs_variant=ok
-new_repo r17t
-attempt "adding the line to a CLAUDE.md that lacks it" ok "" change_settings '$a - **Review format 2 required from:** `ABC-200`' ABC-150 "feat(ABC-150): x"
-unset cs_variant
-
-echo "== the change that introduces the lock is merged without being refused"
-r="$tmp/boot"; def=master; pfx=ABC
-git init -q -b master "$r"
-printf -- '- **Default branch:** `master`\n- **Change prefix:** `ABC`\n' > "$r/CLAUDE.md"
-g add -A
-g commit -q -m "chore(ABC-001): init"
-g switch -q -c lock-intro
-mkdir -p "$r/.githooks"
-cp "$here/trunk-lock-check.mjs" "$here/reference-transaction" "$here/install-trunk-lock.sh" "$r/.githooks/"
-chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-trunk-lock.sh"
-printf -- '- **Version files:** `package.json`.\n- **Master lock starts at:** `ABC-010`\n' >> "$r/CLAUDE.md"
-g add -A
-g update-index --chmod=+x .githooks/reference-transaction .githooks/install-trunk-lock.sh
-g commit -q -m "chore(ABC-002): add the lock"
-g switch -q master
-g config core.hooksPath .githooks
-attempt "merging the change that adds the lock, once git already finds its hook" ok "" g merge --no-ff -q lock-intro -m "chore(ABC-002): add the lock"
-attempt "an unnumbered commit afterwards" refused "carries no ABC change number" commit_with x none "fix typo"
-
-echo "== a tip from before the rename still counts as holding the lock"
-new_repo r18 ABC master 010 version
-g config --unset core.hooksPath
-g rm -q --cached .githooks/trunk-lock-check.mjs
-cp "$here/trunk-lock-check.mjs" "$r/.githooks/master-lock-check.mjs"
-g add .githooks/master-lock-check.mjs
-g commit -q -m "chore(ABC-003): the checker under its old name"
-g config core.hooksPath .githooks
-attempt "incomplete settings are refused when the tip holds the checker under its old name" refused "settings are incomplete" commit_with ABC-020 ok "feat(ABC-020): x"
-
-echo "== complete settings are enforced whatever the lock's own files"
-# The hook files run from outside the repository here, so the check for the lock's files in the tip
-# is false throughout; this pins the settings rule (the file check only matters when the settings
-# are incomplete, which the bootstrap test above covers), not the file check itself.
-new_repo r17
-cp -r "$r/.githooks" "$tmp/r17-hooks"
-g config core.hooksPath "$(cd "$tmp/r17-hooks" && pwd -W 2>/dev/null || pwd)"
-g rm -r -q .githooks
-attempt "moving the hook files out of the repository (a number below the start)" ok "" g commit -q -m "chore(ABC-005): move the hook files out of the repository"
-attempt "an unnumbered commit afterwards is still refused, the settings being complete" refused "carries no ABC change number" commit_with x none "fix typo"
-
-echo "== R8: the status check"
-new_repo r8
-check "status when the lock is on" 0 "Trunk lock: ON" status_in
-g config --unset core.hooksPath
-check "status with core.hooksPath unset" 1 "Trunk lock: OFF" status_in
-g config core.hooksPath elsewhere
-check "status with the wrong hook folder" 1 "not this project's" status_in
-g config core.hooksPath .githooks
-g update-index --chmod=-x .githooks/reference-transaction
-check "status when the hook file is not executable" 1 "not marked executable" status_in
-g update-index --chmod=+x .githooks/reference-transaction
-check "status with the hook file back to executable" 0 "Trunk lock: ON" status_in
-mv "$r/.githooks/reference-transaction" "$r/.githooks/gone"
-check "status with the hook file missing" 1 "reference-transaction is missing" status_in
-mv "$r/.githooks/gone" "$r/.githooks/reference-transaction"
-sed -i '/Master lock starts at/d' "$r/CLAUDE.md"
-check "status with the settings incomplete" 1 "Master lock starts at" status_in
-g checkout -q -- CLAUDE.md
-g config --unset core.hooksPath
-check "the setup script switches the lock on" 0 "Trunk lock: ON" bash "$r/.githooks/install-trunk-lock.sh"
-check "the setup script set the hook folder" 0 ".githooks" g config --get core.hooksPath
-check "the setup script is safe to run again" 0 "Trunk lock: ON" bash "$r/.githooks/install-trunk-lock.sh"
-
-echo "== the gate agrees with the records already merged into this project"
-top=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null)
-if [ -n "$top" ] && [ -d "$top/docs/reviews" ]; then
-  for f in "$top"/docs/reviews/*.md; do
-    case "$f" in *-before.md) continue ;; esac
-    grep -qE '^- \*\*Review format:\*\* accountability' "$f" || continue
-    num=$(basename "$f" | grep -oE '^[A-Za-z]+-[0-9]+')
-    check "gate passes the existing record $num" 0 "" bash -c "cd '$top' && node '$checker' gate $num"
-  done
-fi
-
-echo
-echo "$pass passed, $fail failed"
-[ "$fail" = 0 ]
+echo "trunk lock tests: $pass passed, $fail failed"
+[ "$fail" -eq 0 ]

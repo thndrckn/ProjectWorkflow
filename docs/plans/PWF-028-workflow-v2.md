@@ -146,7 +146,7 @@ then PWF-001 to PWF-027 (exactly those) and their records are unchanged (`git di
 - [x] 1. Plan: this file; `workflow-v2.md` moved to `docs/`; `docs/design.md` marked superseded; Jason approves; commit "approved plan"
 - [x] 2. Repo layout: root becomes the plugin; marketplace pins Matt's plugin by commit
 - [x] 3. Skills: the six skills
-- [ ] 4. Lock: new review record, `NNN.N` numbers, small fast tests
+- [x] 4. Lock: new review record, `NNN.N` numbers, small fast tests
 - [ ] 5. Guard: shell-command check removed, trunk-edit and plan-mode blocks kept, small tests
 - [ ] 6. Repo settings: CLAUDE.md, `.gitattributes`, shared policy and process backlog copied in, backlog entry
 - [ ] 7. Setup script: `adopt.sh`; `release/` from a local tag; test on a throwaway copy

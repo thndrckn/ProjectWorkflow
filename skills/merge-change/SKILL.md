@@ -16,7 +16,7 @@ Steps 1 to 4 run in the change's worktree (a large change: the integration branc
 
 ## 2. Records and gate
 - The plan exists, a review record with the same file name exists, and `CHANGELOG.md` has an entry for the number. The plan is unchanged since `docs(<NUMBER>): approved plan` (`git diff <that commit> -- <plan>` is empty; find it with `git log --grep`).
-- Run the checker's `gate <NUMBER>` (the same code the lock applies). Its failures are the failures. For a **large change** the gate also needs every ticket's record to have passed and the spec's list to have no open finding: each one fixed, accepted by Jason, or moved to `docs/BACKLOG.md`.
+- Run the checker's `gate <NUMBER>` (the same code the lock applies). Its failures are the failures. For a **large change** the gate also needs every ticket's record to have passed and the change's own record (the spec's list of carried findings) to have no open finding: each one fixed, explained, accepted by Jason, or moved to `docs/BACKLOG.md`.
 - On any failure STOP and list each in one plain line. Tell Jason that `/code-change` on this branch continues the change. Write nothing.
 
 ## 3. Announce

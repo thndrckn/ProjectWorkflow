@@ -15,7 +15,7 @@ Second step of the workflow for a large change: design → **plan** → code eac
 ## 2. Make them ours
 Move the spec to `docs/plans/<NUMBER>-<short-title>.md` and the tickets to `docs/plans/<NUMBER>-<short-title>/`. Then:
 - Rename the tickets **NNN.1, NNN.2, …** (file names, headings) and fix every "Blocked by" line to the new numbers.
-- Add a **Spec's list** to the spec: the tickets, plus (later) findings carried from one ticket to a later one.
+- Add a **Spec's list** to the spec: the tickets. The spec is frozen once approved, so findings carried from one ticket to a later one are written in the change's own review record (`docs/reviews/<NUMBER>-<short-title>.md`, same file name as the spec), which `/code-change` creates with the first carried finding or the last ticket, and which must end with every finding settled.
 - Rate each ticket as in `plan-small-change` step 3 (door, blast radius, Light or Full) and Jason picks each level.
 - Write numbered Given/When/Then requirements for each ticket from the spec, with a test each.
 - Record the type, the included backlog items, and the Check-in section (integration branch `<type>/<NUMBER>-<short-title>`, merge commit message).
