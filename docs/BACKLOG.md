@@ -41,3 +41,9 @@ Entry format:
 - **Severity:** Low
 - **Files:** `docs/workflow-v2.md`, `skills/code-change/SKILL.md`
 - **What's wrong:** The workflow allows one narrow re-review. If that re-review rejects a fix or raises something new, the fixes made after it are checked by nobody, and the record can only say the round was not clean and that Jason decided. Consider a narrow check of those fixes when they are to the lock or guard.
+
+## docs/POLICY.md still describes the old commands
+- **Found in:** PWF-028
+- **Severity:** Low
+- **Files:** `docs/POLICY.md`
+- **What's wrong:** docs/POLICY.md still describes the old commands; update it (planned as PWF-029).

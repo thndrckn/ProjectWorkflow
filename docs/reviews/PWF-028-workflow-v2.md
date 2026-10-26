@@ -206,7 +206,7 @@ What Jason decided: N1 and N2 are accepted without another check. C3 was checked
 | R15 | `release/` is a worktree at the local tag v0.1.0; `git check-ignore release` matches; no remote branch added | Pass (checked by Claude) |
 | R16 | `test-adopt.sh` on a throwaway copy with a stand-in for the claude command: the lock is on and both plugins are installed from the marketplace | Pass (checked by Claude) |
 | R17 | This record, from Matt's code-review plus our Correctness reviewer | Pass (checked by Claude) |
-| R18 | Old records PWF-001 to PWF-027 unchanged (`git diff` empty); core.hooksPath never set by Claude; nothing pushed (no remote branch or tag added); verification record in docs/PWF-028-verification.md, written before check-in; changelog entry present; check-in message to be read at check-in (see the verification record) | Pass (checked by Claude) |
+| R18 | Old records PWF-001 to PWF-027 unchanged (`git diff` empty); core.hooksPath never set by Claude; nothing pushed (no remote branch or tag added); verification record in docs/reviews/PWF-028-workflow-v2-verification.md, written before check-in; changelog entry present; check-in message to be read at check-in (see the verification record) | Pass (checked by Claude) |
 
 ## Deviations from the plan
 - The spec's list: the plan keeps the spec frozen after approval, so findings carried from one ticket to a later one go in the large change's own review record, not in the spec. The skills and the lock follow this.

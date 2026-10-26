@@ -52,4 +52,4 @@
 
 > feat(PWF-028): workflow v2 on Matt Pocock's skills
 >
-> Done by hand: the workflow cannot check in its own rebuild, so the old /plan-change, /code-change and /commit-change were not used. Each step was committed on the branch and checked by Claude; the plan was approved by Jason, and the review record and this change's verification record (docs/PWF-028-verification.md) are in the repo.
+> Done by hand: the workflow cannot check in its own rebuild, so the old /plan-change, /code-change and /commit-change were not used. Each step was committed on the branch and checked by Claude; the plan was approved by Jason, and the review record and this change's verification record (docs/reviews/PWF-028-workflow-v2-verification.md) are in the repo.
