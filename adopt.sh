@@ -22,9 +22,11 @@ proj="$(git -C "$proj" rev-parse --show-toplevel)"
 # The workflow's own repo runs its lock from its own githooks folder (CLAUDE.md, "Trunk lock"): the lock's
 # status check only accepts that folder, and release/ is untracked, so a worktree could not find it. Pointing
 # git at release/ here would read as "lock off" there. Same git directory means the same repo, worktrees included.
-common_dir() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
+# The directory is resolved with cd and pwd -P (older git has no --path-format), and compared with -ef, so a
+# difference in upper/lower case or in how a path is spelled on Windows cannot make the same repo look different.
+common_dir() { (cd "$1" && cd "$(git rev-parse --git-common-dir)" && pwd -P) 2>/dev/null; }
 mine=$(common_dir "$here")
-[ -n "$mine" ] && [ "$mine" = "$(common_dir "$proj")" ] && stop "this is the workflow's own repo, which uses its own githooks folder. Run: bash githooks/install-trunk-lock.sh"
+[ -n "$mine" ] && [ "$mine" -ef "$(common_dir "$proj")" ] && stop "this is the workflow's own repo, which uses its own githooks folder. Run: bash githooks/install-trunk-lock.sh"
 # Checked after the refusal above, because a worktree of the workflow's own repo has no release/ folder.
 [ -f "$release/.claude-plugin/marketplace.json" ] || stop "release/ is not set up here. From the ProjectWorkflow folder run: git worktree add release <a local tag, for example v0.1.0>"
 [ -f "$proj/CLAUDE.md" ] || stop "the project has no CLAUDE.md. Copy the Workflow lines from ProjectWorkflow's CLAUDE.md into one first."
