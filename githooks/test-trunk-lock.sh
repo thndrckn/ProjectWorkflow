@@ -129,5 +129,13 @@ g switch -q -c tick2 trunk; put ok; printf 'z\n' > "$r/t.txt"; g add -A; g commi
 g switch -q trunk
 expect 1 "only a whole change number" "a ticket's own commit as the tip of trunk is refused" g merge -q --ff-only tick2
 
+# --- a lock loaded from outside the project (adopt.sh): its fail-closed checks still apply
+new_repo ext; n=PWF-035
+g config --unset core.hooksPath
+printf -- '- **Default branch:** `trunk`
+' > "$r/CLAUDE.md"; g add -A; g commit -q -m "chore(PWF-035): break the settings"
+cp -r "$r/githooks" "$tmp/extlock"; g config core.hooksPath "$tmp/extlock"
+expect 1 "settings are incomplete" "an outside lock refuses when the project's settings are broken" bash -c "cd '$r' && echo y > a && git add a && git commit -q -m 'feat($n): x'"
+
 echo "trunk lock tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

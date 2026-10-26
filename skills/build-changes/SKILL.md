@@ -28,7 +28,7 @@ If any of these fails, STOP and tell the user in plain English what is wrong.
 Read `CHANGELOG.md` and list every entry under `## [Unreleased]`, exactly as written, in plain English. If there are none, first check whether the newest version heading in `CHANGELOG.md` has no matching `v*` tag. If it has none, an earlier build was interrupted after the merge: tell the user, and with their OK continue from step 6 for that version. Otherwise STOP and say there is nothing to build.
 
 ## 3. Propose the version
-- Find the current version from the newest version heading in `CHANGELOG.md` and the latest `v*` git tag. Find the latest tag with `git tag --list "v*" --sort=-v:refname` (sorted by version, never alphabetically, so `v1.9.0` sorts below `v1.21.0`) and take the first one. If no `v*` tag exists, STOP and ask the user which commit the review in step 5 should start from. If the tag and the newest heading disagree, STOP and tell the user.
+- Find the current version from the newest version heading in `CHANGELOG.md` and the latest `v*` git tag. Find the latest tag with `git tag --list "v*" --sort=-v:refname` (sorted by version, never alphabetically, so `v1.9.0` sorts below `v1.21.0`) and take the first one. If no `v*` tag exists, STOP and ask the user which commit the build should count from. If the tag and the newest heading disagree, STOP and tell the user.
 - Propose the next version: a minor bump if any waiting entry is a `(feat)`, otherwise a patch bump. Show which entry decided it.
 - Ask the user to approve it, using the question box with the proposed version as the first option "(Recommended)". The user may choose a different version. STOP until they answer.
 

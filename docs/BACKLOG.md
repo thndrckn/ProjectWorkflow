@@ -12,12 +12,6 @@ Entry format:
 - **What's wrong:** <plain English>
 ```
 
-## Default-branch guard: an absolute path into another worktree is allowed, the same path written relatively is blocked
-- **Found in:** PWF-017
-- **Severity:** Informational
-- **Files:** `.claude/hooks/shell-command-check.js`, `.claude/hooks/block-main-edits.sh`
-- **What's wrong:** While the main folder is on the default branch, a shell command that writes to another worktree's folder (for example `cp` or `Copy-Item` of a plan file into a change's worktree) is allowed when the destination is written as an absolute path, because that worktree is judged by its own branch, and is blocked when the same destination is written relatively, because a relative path cannot be resolved and counts as inside the project. The reviewer who rated it found this intended, best-effort behaviour that fails closed, not a defect, and not caused by PWF-017; it is logged at the user's direction because the cost is only that cross-worktree writes need absolute paths.
-
 ## dev.mjs tells a worktree user to run npm install when node_modules is missing
 - **Found in:** PWF-023
 - **Severity:** Low
@@ -29,3 +23,15 @@ Entry format:
 - **Severity:** Low
 - **Files:** `hooks/block-main-edits.sh`
 - **What's wrong:** The guard checks the session's own branch, not the folder being written to. Noted while rebuilding the guard in PWF-028 and left as it was.
+
+## The lock does not catch moving trunk backwards
+- **Found in:** PWF-028
+- **Severity:** Low
+- **Files:** `githooks/trunk-lock-check.mjs`
+- **What's wrong:** The lock only looks at commits new to trunk. Moving trunk back (for example `git reset --hard HEAD~5`) adds none, so it is allowed and history can be rewound silently. It was already so before PWF-028.
+
+## A branch merged into trunk can carry its own copy of the lock
+- **Found in:** PWF-028
+- **Severity:** Informational
+- **Files:** `githooks/trunk-lock-check.mjs`, `githooks/reference-transaction`
+- **What's wrong:** In a project that keeps the lock inside the project, git has already checked out the incoming branch's files when the hook runs, so a branch could carry a weakened checker. The rule against loosening CLAUDE.md's lock settings does not cover the checker's own code; review is the protection. A project that loads the lock from `release/` is not affected. It was already so before PWF-028.

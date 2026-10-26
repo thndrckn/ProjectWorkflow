@@ -15,7 +15,7 @@ Third step: design → plan → **code** (with review) → merge. Takes a change
 - In one plain line, tell Jason which other open changes touch the same files, and carry on.
 
 ## 2. Code
-Build exactly what the plan says; if it is wrong or impossible, STOP and explain. Use `mattpocock-skills:tdd`, or for type **fix**, `mattpocock-skills:diagnosing-bugs` (reproduce the bug reliably, usually a failing test, before touching code, and keep that test). Follow CLAUDE.md. Commit as you go as `<type>(<NUMBER>): …`. Fix a plan's backlog items by removing them from `docs/BACKLOG.md`; add accepted ones to `docs/DECISIONS.md` with the reason. Never run anything against the data folder. Run CLAUDE.md's checks; fix until they pass.
+Build exactly what the plan says; if it is wrong or impossible, STOP and explain. Use `mattpocock-skills:tdd`, or for type **fix**, `mattpocock-skills:diagnosing-bugs` (reproduce the bug reliably, usually a failing test, before touching code, and keep that test). Follow CLAUDE.md. Commit as you go as `<type>(<NUMBER>): …`. Fix a plan's backlog items by removing them from `docs/BACKLOG.md`; add accepted ones to `docs/DECISIONS.md` with the reason. Never run anything against the data folder (CLAUDE.md's "Data folder" line); before any migration, take the steps in its "Backup before a migration" line (if it has none, say so and ask Jason how to back up). Run CLAUDE.md's checks; fix until they pass.
 
 ## 3. Review
 You wrote the code, so you do not rate it. Reviewers only read and report, never edit.

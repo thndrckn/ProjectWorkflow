@@ -116,7 +116,7 @@ function findingBlocks(body) {
     const text = block.join('\n');
     // A bullet is a finding if it has the severity form or a finding's own labelled line, so one
     // written without the severity form is refused, not skipped.
-    if (/^- \*\*\[[^\]]*\]\*\*/.test(text) || /\*\*(?:Caused by this change|Outcome):\*\*/.test(text)) blocks.push(text);
+    if (/^- \*\*?\[[^\]]*\]/.test(text) || /\*\*(?:Caused by this change|Outcome):\*\*/.test(text)) blocks.push(text);
   }
   return blocks;
 }
@@ -263,7 +263,7 @@ function refuse(branch, problems) {
 
 function checkRange(oldTip, newTip, cfg) {
   const problems = [];
-  const raw = git(['log', '--format=%H%x1f%P%x1f%s%x1e', `${oldTip}..${newTip}`]);
+  const raw = git(['log', '--topo-order', '--format=%H%x1f%P%x1f%s%x1e', `${oldTip}..${newTip}`]);
   const commits = raw.split('\x1e').map((s) => s.replace(/^\n/, '')).filter(Boolean).map((s) => {
     const [hash, parents, subject] = s.split('\x1f');
     return { hash, parents: parents.split(' ').filter(Boolean), subject: subject ?? '' };
@@ -312,9 +312,10 @@ function lockPresentAt(tip) {
   if (ownRel === null) {
     ownRel = path.relative(git(['rev-parse', '--show-toplevel']).trim(), fileURLToPath(import.meta.url)).replace(/\\/g, '/');
   }
-  // A tip from before the rename holds the checker under its old name.
-  const oldRel = ownRel.replace(/trunk-lock-check\.mjs$/, 'master-lock-check.mjs');
-  return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null || gitTry(['cat-file', '-e', `${tip}:${oldRel}`]) !== null;
+  // A checker that lives outside the project (adopt.sh points git at the plugin's release/ folder)
+  // was switched on on purpose, so the lock counts as present: its fail-closed checks apply.
+  if (ownRel.startsWith('..')) return true;
+  return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null;
 }
 
 // The default branch as git itself knows it: where the remote's HEAD points, and init.defaultBranch.

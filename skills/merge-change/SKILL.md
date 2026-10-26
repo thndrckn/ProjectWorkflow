@@ -37,7 +37,7 @@ Skip if the default branch has no commits the branch lacks (`git log HEAD..<defa
 - Only after the push succeeds: `git worktree remove <path>` (never forced), then `git branch -d <branch>` (never `-D`; for a large change also its ticket branches). If a file is locked, say what is left for Jason to close or delete, and delete the branch only if the worktree is gone.
 
 ## 6. Report
-In plain English: the number and title checked in; that the default branch is on GitHub and the worktree and branch are gone (or what is left); anything Jason still does by hand (a migration, after CLAUDE.md's backup step). Last, only if the plan has "Original request (set aside)": a one-line lead-in saying it is still waiting, then a fenced block holding `/design-change ` plus the request exactly as recorded, ready to paste. Nothing after it.
+In plain English: the number and title checked in; that the default branch is on GitHub and the worktree and branch are gone (or what is left); anything Jason still does by hand (a migration, after the steps in CLAUDE.md's "Backup before a migration" line; if CLAUDE.md has no such line, say so and ask how to back up). Last, only if the plan has "Original request (set aside)": a one-line lead-in saying it is still waiting, then a fenced block holding `/design-change ` plus the request exactly as recorded, ready to paste. Nothing after it.
 
 ## Never
 - Merge without steps 1 to 4, or a change whose gate fails, or a ticket number.
