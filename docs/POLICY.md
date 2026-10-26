@@ -26,12 +26,14 @@ This applies to engineering practices too — version numbers, changelogs, and c
 ---
 
 ## Workflow model
-Every project is run like a professional software shop. Every change goes through four steps, in order, and nothing reaches the default branch without all four:
+Every project is run like a professional software shop. Every change goes through four steps, in order, and nothing reaches the default branch without all four. The design is `docs/workflow-v2.md`.
 
-1. **Plan** (`/plan-change`): the user is first asked, one item at a time, what to do with each entry in the project backlog (plan it now, include it in this change, keep it queued, or accept it), then interviewed one question at a time until the change is understood, then approves a written plan. The plan assigns the change number and settles the type, branch, and commit message.
-2. **Code** (`/code-change`, started only by the user): the work happens on its own branch, created from the default branch. Code is never edited on the default branch.
-3. **Review** (part of `/code-change`): reviewers independent of the author check the work and rate every finding, including whether this change caused it; the author never rates its own code and never has the last word on its own findings. The author settles each finding itself (fix, explain, or log, within the rules below) and records it, and a fresh reviewer checks every outcome, including every fix. It stops and asks the user only in four cases: a fix would go against the approved plan, a fix would touch the user's data, the re-reviewer rejects an explanation the author still stands by, or the re-review is still not clean after its last permitted round, or needs a round only the user can authorise.
-4. **Check in** (`/commit-change`, started only by the user): the review record is checked against the review rules, and the branch is merged into the default branch and pushed only if it passes. A failed check goes back through `/code-change`, which continues the change on its existing branch.
+1. **Design and plan** (`/design-change`, or `/plan-small-change` / `/plan-large-change` typed directly): the change gets its number, the user is shown the project backlog once, the change is thought through by interview, and the user approves a written plan. A change that fits in one session is a small change; a bigger one gets a spec and numbered tickets (`NNN.1`, `NNN.2`, ...).
+2. **Code** (`/code-change`, started only by the user): the work happens in a worktree on the change's own branch, test-first, never on the default branch. A large change is coded one ticket at a time.
+3. **Review** (part of `/code-change`): reviewers independent of the author check the work (Light: Standards and Spec; Full: also Correctness). The author fixes or explains each finding, then one fresh reviewer checks only those outcomes. Anything still disputed goes to the user, who decides.
+4. **Check in** (`/merge-change`, started only by the user): the trunk lock checks the review record, and the branch is merged into the default branch only if it passes.
+
+A version is made later by `/build-changes` (started only by the user).
 
 Finish one change through check-in before starting the next, so every new branch starts from up-to-date work. The exception is a project whose CLAUDE.md sets up worktrees: there each change is coded in its own worktree, so several can be in flight at once, and each catches up with the default branch at check-in.
 
@@ -39,7 +41,7 @@ Each project's CLAUDE.md names its default branch and change prefix. The step-by
 
 Process improvement ideas go in `PROCESS_BACKLOG.md`, next to this file.
 
-This file, `PROCESS_BACKLOG.md` and anything else in the shared conventions folder are edited by the user by hand only. Claude never edits them, by any route, and each project's guard hook blocks it. A project's CLAUDE.md names the folder on its "Shared conventions folder" line. A change that needs the shared folder edited lists the exact old and new text in its plan, under "Policy edits for you to make by hand". `/code-change` saves a before-copy of each file on the change's branch, stops until the user confirms the edit is made, and gives the reviewers the before-copy and the edited file.
+This file and `PROCESS_BACKLOG.md` live in `docs/` of the ProjectWorkflow repo. They are changed through normal changes like any other file: planned, approved by the user in the plan, coded on a branch and reviewed.
 
 ---
 
@@ -47,14 +49,13 @@ This file, `PROCESS_BACKLOG.md` and anything else in the shared conventions fold
 1. Tests never use a made-up change or a test-only decision; a check that needs a live run uses the next real change.
 2. Workflow and tooling changes are type chore.
 3. Shared skills and hooks never contain anything project-specific (numbers, file names, app features); project facts come from CLAUDE.md. The shared workflow's own paths (plans, reviews, changelog, backlog, decisions) are not project-specific.
-4. A plan whose change needs an edit to the shared conventions folder gives the exact old and new text in a "Policy edits for you to make by hand" section, so nothing about the wording is left to coding. A plan with no such edit leaves the section out.
 
 ---
 
 ## Change numbers
 Every change gets a number, like a ticket: the project's prefix plus three digits, for example `ABC-085`. Each project's CLAUDE.md sets its prefix.
 
-- The number is assigned when planning starts (`/plan-change`): the next one after the highest number in the CHANGELOG, the plans folder or the local branch names, claimed at once with a placeholder plan file so two planning chats never take the same number. Numbers are never reused or changed.
+- The number is assigned when planning starts (`/design-change`, or `/plan-small-change` / `/plan-large-change`): the next one after the highest number in the CHANGELOG, the plans folder or the local branch names, claimed at once with a placeholder plan file so two planning chats never take the same number. Numbers are never reused or changed. A large change's tickets are numbered NNN.1, NNN.2, ... under the change's number.
 - The number appears everywhere the change does: the plan file, the branch, every commit message, the review record, and the CHANGELOG entry. Any one of them leads to all the others.
 - Every change gets a number, including documentation-only changes.
 
@@ -149,8 +150,8 @@ Do not perform any "cleanup," "reorganization," or file removal anywhere in the 
 ## Committing
 - Work is committed on its own branch as it's built. Branch commits stay on your computer; they aren't pushed.
 - Nothing is ever committed directly to the default branch. Code edits there are blocked by a hook.
-- A change is **checked in** when `/commit-change` merges its branch into the default branch, pushes it to GitHub, and deletes the branch. The default branch is never left ahead of GitHub.
-- Manual edits (for example, editing CLAUDE.md by hand) are checked in the same way: plan them as a change, and `/code-change` carries them onto a branch.
+- A change is **checked in** when `/merge-change` merges its branch into the default branch. Nothing is pushed until the user says so.
+- Manual edits (for example, changing CLAUDE.md directly) are checked in the same way: plan them as a change, and `/code-change` carries them onto a branch.
 
 ---
 
@@ -184,31 +185,26 @@ Every commit message includes the change number as its scope, for example `feat(
 
 **Scope:** the change's branch compared against the default branch. A full-codebase review happens instead when meaningful change has built up since the last one. That's a judgment call, and either the user or Claude can flag that one feels due.
 
-**Depth**, by change type:
-- `feat:`: at least two passes, general correctness plus the most relevant second angle (data integrity for schema changes, security for external input, and so on).
-- `fix:`: one thorough pass: confirm the root cause was fixed, and check for the same bug pattern elsewhere in the touched files.
-- `refactor:`: one pass, checking that behavior didn't change.
+**Depth**, by merge danger (the definition in Matt's `pr` skill: the door, one-way or two-way, and the blast radius), chosen by the user from the planner's recommendation when the plan is written, not by change type:
+- **Light** (a two-way door and a small blast radius): Matt's `code-review`, a Standards reviewer and a Spec reviewer.
+- **Full** (a one-way door or a wide blast radius; when unsure, Full; changes to the lock or guard are always Full): the same two plus a Correctness reviewer.
 
-**Reviewers:** the review is done by fresh reviewers that see only the diff, the approved plan and the project's standards, never the author's reasoning (a re-reviewer, whose job is to check the author's outcomes, is also given each outcome and the reason for it). Each finding gets a severity (Informational, Nit, Low, Medium or High) and a label, "caused by this change: yes/no", from the reviewer. Caused means the problem is in what this change added or altered, or in behaviour it changed. The author never changes either; if it disagrees, it says so in the record and the value stays. It can move a "yes" to "no" only by explaining why, and the re-reviewer must accept the explanation.
+**Reviewers:** fresh reviewers that see only the diff, the approved plan and the project's standards, never the author's reasoning. The author does not review its own code and does not have the last word on a finding. Each finding gets a severity (Informational, Nit, Low, Medium or High) and a "caused by this change: yes/no" label from the reviewer; the author may not change either, and disagrees by saying so in the record.
 
-**Settling findings:** the author settles every finding itself, without waiting for approval: fixed, explained (not a real problem, with the reason), or logged in the project's backlog file (`docs/BACKLOG.md`). A finding this change caused must end as fixed, or as explained with a reason the re-reviewer accepts; it can never be logged or accepted as is. A finding this change did not cause may be fixed, explained or logged, at any severity, and the re-reviewer confirms it wasn't caused here. A failed requirement test is not a reviewer finding; it is always caused and can only be fixed.
+**Settling findings:** the author fixes each finding, explains why it is not a problem, or logs it in `docs/BACKLOG.md`. Each finding is written up in the user's format: severity, "caused by this change", a plain-English description and a recommendation. A finding this change caused must be fixed or explained, never logged. A failed requirement test is not a reviewer finding; it can only be fixed.
 
 **Where a "why" is written down:** a by-design reason that belongs to one spot in the code goes in a comment at that spot, and the author adds that comment as part of settling the finding; it gets no entry in the project's decisions file (`docs/DECISIONS.md`) and is recorded in the review record only. A reason that applies project-wide goes in the decisions file. Reviewers check that code the change adds or alters, when it is non-obvious (a hidden constraint, a workaround, a surprising choice), has a "why" comment; a missing one is a Low standards finding. Obvious code needs no comment and old code is not flagged.
 
-**Re-review:** whenever there is any outcome at all (any fix, explanation or logged item, or a fixed failed requirement), at every severity, a fresh reviewer re-checks every explanation, every logged item and every fix, and labels any new finding. A round is clean only when the re-reviewer accepts everything and raises no new finding at all, so a fix to a re-reviewer's own finding is always checked by the next round. It repeats with a new fresh reviewer after any round that isn't clean, until a round is clean, up to three rounds in total for the change, plus any further round only if the user authorises it (for example to check a fix made after a failed check-in gate), recorded in the review record as "Settled by the user: <answer>" under that round (the check-in gate looks for that phrase). If the third is still not clean, the author stops and shows the user what's still open, and the user's recorded answer settles those items. If the re-reviewer rejects an explanation, a "not caused" label or a fix, the author fixes the problem properly (a rejected "not caused" label means the finding counts as caused), or logs it if this change didn't cause it; if it still disagrees, it stops and asks the user.
+**Re-review:** one round. A fresh reviewer is given only the findings and the code changed to address them. It confirms each fix and checks each finding that was explained instead of fixed. Anything it still disputes goes to the user with both sides in plain English, and the user decides. `/code-change` run again on an existing branch continues the change; earlier findings are never rewritten.
 
-**When to stop and ask the user:** only in four cases. (1) A fix would go against the approved plan. (2) A fix would touch the user's data, whatever the finding's severity: migrations, delete behaviour, import/export/backup code, or the data directory. (3) The re-reviewer rejects an explanation, label or fix and the author still disagrees after fixing or logging as above. (4) The last permitted re-review round (the third, or an extra round the user authorised) is still not clean, or a further round beyond the third is needed, which only the user can authorise. The plan wins over any finding.
+**When to stop and ask the user:** only when (1) a fix would go against the approved plan, (2) a fix would touch the user's data, whatever the finding's severity (migrations, delete behaviour, import/export/backup code, or the data directory), or (3) the re-reviewer rejects an outcome the author still stands by. The plan wins over any finding.
 
-**Continuing a change:** `/code-change` run on an existing working branch continues that change: it fixes, re-runs the checks, re-reviews and appends a new round to the review record without touching the plan. A review record that fails the check-in gate goes back through it. Earlier findings and rounds are never rewritten; a record problem is fixed by adding a round-numbered correction line, and a missing label or severity is supplied by a fresh reviewer, never by the author.
-
-**Record:** each change gets its own review record at `docs/reviews/<change number>-<title>.md`, citing the approved plan, with every finding, its reviewer-assigned severity and caused label and its disposition (fixed, explained with the reason, or logged), each re-review round, any deviations from the plan, and a summary. A record in the new format carries a `Review format: accountability` line. At check-in, `/commit-change` checks a new-format record against these rules (every finding labelled; no caused finding logged; every explanation, logged item and fix accepted by a re-reviewer; the loop finished clean within three rounds; no failed requirement) and stops with a plain-English list of what failed. Records in the old format are exempt. Every finding is recorded, whatever its disposition; the record shows what was checked and decided, not just what was changed. The record also has a trace table with one row per requirement: the requirement, its test, and the result. The hand-off gives the user a short plain-English summary of what was found and done. In a record marked Review format: accountability 2, every finding carries a line **Re-review (round N):** accepted or **Re-review (round N):** rejected for each round that checked it, and the latest one counts; a fixed failed requirement gets **Re-review (round N):** R<id> accepted in the round that checked it; and every round ends with **Round N clean:** yes or **Round N clean:** no. The check-in gate reads these lines exactly, and from the change number named by "Review format 2 required from" in the project's instructions on, a record without this marker is refused.
-
-The old single-file log (`PEER_REVIEW.md`) is kept as an archive of earlier reviews.
+**Record:** each change (and each ticket) gets a review record at `docs/reviews/<number>-<title>.md` with the level, the findings and their outcomes, who decided any dispute, and a trace table (requirement, test, result). The trunk lock checks the record is complete before the default branch moves. It cannot prove the user made a decision; the user's approval of the review is that proof.
 
 ---
 
 ## Before starting any task
-**No code is written until a plan has been approved.** Every change starts with `/plan-change`.
+**No code is written until a plan has been approved.** Every change starts with `/design-change`, `/plan-small-change` or `/plan-large-change`.
 
 - If anything about the task is unclear, ask. Don't assume. Ask one question at a time, with a recommended answer, and wait for the reply.
 - The plan is saved at `docs/plans/<change number>-<title>.md`. It opens with a plain-English summary for the user (what will change, what could go wrong or get lost, what's not included, how to check it, and the check-in decisions), followed by the technical detail: files, layers (Rust or frontend) and why, existing code to reuse, and any known debt the change touches.
