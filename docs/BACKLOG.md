@@ -1,6 +1,6 @@
 # Backlog
 
-Review findings that were neither fixed nor explained. Only findings a change did not cause end up here; there are no feature ideas. Every `/plan-change` puts each entry to the user: plan it now, include it in this change, keep it queued, or accept it (it then moves to `docs/DECISIONS.md` with a reason). A change that fixes an entry removes it; that change's own records keep the history.
+Review findings that were neither fixed nor explained. Only findings a change did not cause end up here; there are no feature ideas. Every `/design-change` puts each entry to the user: plan it now, include it in this change, keep it queued, or accept it (it then moves to `docs/DECISIONS.md` with a reason). A change that fixes an entry removes it; that change's own records keep the history.
 
 Entry format:
 
@@ -23,3 +23,9 @@ Entry format:
 - **Severity:** Low
 - **Files:** `scripts/dev.mjs`
 - **What's wrong:** When `node_modules` is missing, `npm run dev` says "Run npm install first." In a worktree, CLAUDE.md now says to use `npm ci` instead, so the message gives stale advice there. It is only a message, not a break, and it was already there before this change.
+
+## The guard checks the session's own branch, not the folder being written to
+- **Found in:** PWF-028
+- **Severity:** Low
+- **Files:** `hooks/block-main-edits.sh`
+- **What's wrong:** The guard checks the session's own branch, not the folder being written to. Noted while rebuilding the guard in PWF-028 and left as it was.
