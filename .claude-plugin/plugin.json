@@ -1,0 +1,7 @@
+{
+  "name": "projectworkflow",
+  "version": "0.1.0",
+  "description": "Jason's change workflow: numbered changes, approved plans, reviews, records and a protected trunk, built on Matt Pocock's skills.",
+  "author": { "name": "Jason" },
+  "repository": "https://github.com/thndrckn/ProjectWorkflow"
+}

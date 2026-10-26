@@ -1,0 +1,23 @@
+{
+  "name": "projectworkflow",
+  "description": "Jason's change workflow, plus Matt Pocock's skills pinned to a fixed commit.",
+  "owner": { "name": "Jason" },
+  "plugins": [
+    {
+      "name": "projectworkflow",
+      "description": "Jason's change workflow, built on Matt Pocock's skills.",
+      "source": "./"
+    },
+    {
+      "name": "mattpocock-skills",
+      "description": "Matt Pocock's agent skills, pinned to a fixed commit. Move the pin only as a tested PWF change.",
+      "author": { "name": "Matt Pocock" },
+      "source": {
+        "source": "url",
+        "url": "https://github.com/mattpocock/skills.git",
+        "sha": "49dd158d1076134a641b33efb035946536778336"
+      },
+      "homepage": "https://github.com/mattpocock/skills"
+    }
+  ]
+}

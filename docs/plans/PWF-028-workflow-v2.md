@@ -144,7 +144,7 @@ then PWF-001 to PWF-027 (exactly those) and their records are unchanged (`git di
 ## Steps
 
 - [x] 1. Plan: this file; `workflow-v2.md` moved to `docs/`; `docs/design.md` marked superseded; Jason approves; commit "approved plan"
-- [ ] 2. Repo layout: root becomes the plugin; marketplace pins Matt's plugin by commit
+- [x] 2. Repo layout: root becomes the plugin; marketplace pins Matt's plugin by commit
 - [ ] 3. Skills: the six skills
 - [ ] 4. Lock: new review record, `NNN.N` numbers, small fast tests
 - [ ] 5. Guard: shell-command check removed, trunk-edit and plan-mode blocks kept, small tests

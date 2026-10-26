@@ -4,13 +4,13 @@
       {
         "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell",
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-main-edits.sh\"" }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/block-main-edits.sh\"" }
         ]
       },
       {
         "matcher": "EnterPlanMode",
         "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-plan-mode.sh\"" }
+          { "type": "command", "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/block-plan-mode.sh\"" }
         ]
       }
     ]
