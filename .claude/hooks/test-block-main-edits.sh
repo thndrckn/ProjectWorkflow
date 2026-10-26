@@ -305,7 +305,7 @@ for t in Edit Write MultiEdit NotebookEdit; do
   check "trunk blocks $t climbing out of plans" 2 "$trunk" "$t" "$trunk/docs/plans/../src/x.ts"
   check "main still blocks $t on a project file" 2 "$mainrepo" "$t" "$mainrepo/src/x.ts"
 done
-for c in "echo hi > $trunk/src/x.txt" 'echo hi>f.txt' 'git commit -m x' 'git push --force' 'sed -i s/a/b/ README.md'; do
+for c in "echo hi > $trunk/src/x.txt" 'echo hi>f.txt' 'git commit -m x' 'git push --force' 'git branch -D trunk' 'git branch --delete --force trunk' 'sed -i s/a/b/ README.md'; do
   both "trunk blocks: $c" 2 "$trunk" "$c"
 done
 for c in 'git status' 'git pull --ff-only' 'git merge --no-ff feat' 'git push' 'git push origin trunk' "echo hi > $trunk/docs/plans/ABC-001-x.md" 'git worktree list'; do
