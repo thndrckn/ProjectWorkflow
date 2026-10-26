@@ -1,4 +1,4 @@
-// The master lock's checker. One script, three modes, so the git hook and /commit-change
+// The trunk lock's checker. One script, three modes, so the git hook and /commit-change
 // apply exactly the same rules:
 //   hook <state>            run by .githooks/reference-transaction on every ref update;
 //                           exits non-zero to refuse an update of the default branch.
@@ -46,6 +46,13 @@ function lineValue(text, label) {
   const m = text.match(new RegExp(`^[ \\t]*[-*]?[ \\t]*\\*\\*${esc(label)}:\\*\\*(.*)$`, 'mi'));
   return m ? m[1].trim() : null;
 }
+// The lock was called the "master lock" before the default branch was renamed. CLAUDE.md's lock
+// lines are read under either name (the new one first), so the user can relabel them by hand,
+// with the lock off, before or after this checker lands without the lock losing its settings.
+function lockLineValue(text, suffix) {
+  const found = lineValue(text, `Trunk lock${suffix}`);
+  return found !== null ? found : lineValue(text, `Master lock${suffix}`);
+}
 function firstWord(value) {
   if (value === null) return null;
   const tick = value.match(/`([^`]+)`/);
@@ -69,12 +76,12 @@ function readConfig(claudeMd) {
   const vf = lineValue(claudeMd, 'Version files');
   const versionFiles = vf === null ? [] : [...vf.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
   if (versionFiles.length === 0) problems.push('CLAUDE.md has no "Version files" line naming files');
-  const startRaw = firstWord(lineValue(claudeMd, 'Master lock starts at'));
+  const startRaw = firstWord(lockLineValue(claudeMd, ' starts at'));
   let start = null;
-  if (!startRaw) problems.push('CLAUDE.md has no "Master lock starts at" line');
+  if (!startRaw) problems.push('CLAUDE.md has no "Trunk lock starts at" line (or the older "Master lock starts at")');
   else if (prefix) {
     const m = startRaw.match(new RegExp(`^${esc(prefix)}-(\\d{3,})$`));
-    if (!m) problems.push(`"Master lock starts at" (${startRaw}) is not a change number with the prefix ${prefix}`);
+    if (!m) problems.push(`"Trunk lock starts at" (the older "Master lock starts at") (${startRaw}) is not a change number with the prefix ${prefix}`);
     else start = parseInt(m[1], 10);
   }
   // Optional: a project without the line requires no particular record format. A line that is
@@ -397,7 +404,7 @@ function gateFor(number, rev, cfg = null) {
 
 function refuse(branch, problems) {
   const lines = [
-    `The master lock refused this update to '${branch}'. ${problems.length === 1 ? 'Problem' : 'Problems'}:`,
+    `The trunk lock refused this update to '${branch}'. ${problems.length === 1 ? 'Problem' : 'Problems'}:`,
     ...problems.map((p) => `  - ${p}`),
     '',
     'A change only reaches the default branch through /commit-change, once its review record passes the gate.',
@@ -450,7 +457,9 @@ function lockPresentAt(tip) {
   if (ownRel === null) {
     ownRel = path.relative(git(['rev-parse', '--show-toplevel']).trim(), fileURLToPath(import.meta.url)).replace(/\\/g, '/');
   }
-  return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null;
+  // A tip from before the rename holds the checker under its old name.
+  const oldRel = ownRel.replace(/trunk-lock-check\.mjs$/, 'master-lock-check.mjs');
+  return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null || gitTry(['cat-file', '-e', `${tip}:${oldRel}`]) !== null;
 }
 
 // The default branch as git itself knows it: where the remote's HEAD points, and init.defaultBranch.
@@ -530,7 +539,7 @@ function hookMode(state) {
       else {
         const changed = loosenedSettings(cfg, cfgNew);
         if (changed.length > 0) {
-          problems.push(`A check-in cannot loosen or change the lock's settings in CLAUDE.md (${changed.join('; ')}); the user does that by hand, see CLAUDE.md, "Master lock".`);
+          problems.push(`A check-in cannot loosen or change the lock's settings in CLAUDE.md (${changed.join('; ')}); the user does that by hand, see CLAUDE.md, "Trunk lock".`);
         }
       }
     }
@@ -601,10 +610,10 @@ function statusMode() {
   const cfg = readConfig(fs.existsSync(claudePath) ? fs.readFileSync(claudePath, 'utf8') : null);
   if (!cfg.ok) reasons.push(...cfg.problems);
   if (reasons.length === 0) {
-    process.stdout.write('Master lock: ON.\n');
+    process.stdout.write('Trunk lock: ON.\n');
     return 0;
   }
-  process.stdout.write(`Master lock: OFF. ${reasons.join('; ')}.\nTo switch it on, run: bash ${rel}/install-master-lock.sh\n`);
+  process.stdout.write(`Trunk lock: OFF. ${reasons.join('; ')}.\nTo switch it on, run: bash ${rel}/install-trunk-lock.sh\n`);
   return 1;
 }
 
@@ -615,8 +624,8 @@ try {
   if (mode === 'hook') process.exitCode = hookMode(args[0]);
   else if (mode === 'gate') process.exitCode = gateMode(args);
   else if (mode === 'status') process.exitCode = statusMode();
-  else throw new Error('usage: master-lock-check.mjs hook <state> | gate <change number> [--rev R] | status');
+  else throw new Error('usage: trunk-lock-check.mjs hook <state> | gate <change number> [--rev R] | status');
 } catch (e) {
-  process.stderr.write(`The master lock could not finish its check (${e && e.message ? e.message : e}), so it refuses.\n`);
+  process.stderr.write(`The trunk lock could not finish its check (${e && e.message ? e.message : e}), so it refuses.\n`);
   process.exitCode = 2;
 }

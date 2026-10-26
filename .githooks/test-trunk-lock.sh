@@ -1,5 +1,5 @@
 #!/bin/bash
-# Tests for the master lock. Run: bash .githooks/test-master-lock.sh
+# Tests for the trunk lock. Run: bash .githooks/test-trunk-lock.sh
 # Builds throwaway repos in a temp dir, copies the lock's files into each, switches the
 # lock on and drives real git commands against it (merges, fast-forwards, plain commits,
 # cherry-picks, --no-verify, fetches, tags). Each case says whether the update to the
@@ -11,10 +11,11 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-checker="$here/master-lock-check.mjs"
+checker="$here/trunk-lock-check.mjs"
 
 pass=0; fail=0
 r=""; def=master; pfx=ABC
+lockname=Master   # the label new_repo gives the lock lines in CLAUDE.md; Master is the pre-rename name
 
 g() { git -C "$r" "$@"; }
 
@@ -25,21 +26,21 @@ new_repo() {
   r="$tmp/$name"; def=$d; pfx=$p
   git init -q -b "$d" "$r"
   mkdir -p "$r/.githooks" "$r/docs/reviews"
-  cp "$here/master-lock-check.mjs" "$here/reference-transaction" "$here/install-master-lock.sh" "$r/.githooks/"
-  chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-master-lock.sh"
+  cp "$here/trunk-lock-check.mjs" "$here/reference-transaction" "$here/install-trunk-lock.sh" "$r/.githooks/"
+  chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-trunk-lock.sh"
   {
     printf -- '- **Default branch:** `%s`\n' "$d"
     [ "$omit" = prefix ] || printf -- '- **Change prefix:** `%s`\n' "$p"
     [ "$omit" = version ] || printf -- '- **Version files:** `package.json`, `app/version.txt`. Lockfiles are regenerated.\n'
-    if [ "$omit" = badlock ]; then printf -- '- **Master lock starts at:** `%s-1x`\n' "$p"
-    elif [ "$omit" != lock ]; then printf -- '- **Master lock starts at:** `%s-%s`\n' "$p" "$s"; fi
+    if [ "$omit" = badlock ]; then printf -- '- **%s lock starts at:** `%s-1x`\n' "$lockname" "$p"
+    elif [ "$omit" != lock ]; then printf -- '- **%s lock starts at:** `%s-%s`\n' "$lockname" "$p" "$s"; fi
     [ -z "$f2" ] || printf -- '- **Review format 2 required from:** `%s-%s`\n' "$p" "$f2"
   } > "$r/CLAUDE.md"
   [ "$omit" != claude ] || rm "$r/CLAUDE.md"
   printf '{}\n' > "$r/package.json"; mkdir -p "$r/app" "$r/src"; printf '1\n' > "$r/app/version.txt"
   printf '# Changelog\n' > "$r/CHANGELOG.md"
   g add -A
-  g update-index --chmod=+x .githooks/reference-transaction .githooks/install-master-lock.sh
+  g update-index --chmod=+x .githooks/reference-transaction .githooks/install-trunk-lock.sh
   g commit -q -m "chore($p-001): init"
   g config core.hooksPath .githooks
 }
@@ -318,7 +319,7 @@ on_branch() {
   commit_with "$2" "$3" "$4"
 }
 
-status_in() { ( cd "$r" && node .githooks/master-lock-check.mjs status ); }
+status_in() { ( cd "$r" && node .githooks/trunk-lock-check.mjs status ); }
 
 echo "== R1: every route onto the default branch is allowed when the records pass"
 new_repo r1
@@ -418,8 +419,8 @@ g config init.defaultBranch master
 attempt "no CLAUDE.md at all at the current tip" refused "settings cannot be read" commit_with ABC-020 ok "feat(ABC-020): x"
 new_repo r10h
 attempt "deleting the default branch" refused "cannot be deleted" bash -c "git -C '$r' update-ref -d refs/heads/master"
-check "a line the hook cannot read" 2 "refuses" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/master-lock-check.mjs hook prepared )"
-check "a state other than prepared is ignored" 0 "" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/master-lock-check.mjs hook committed )"
+check "a line the hook cannot read" 2 "refuses" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/trunk-lock-check.mjs hook prepared )"
+check "a state other than prepared is ignored" 0 "" bash -c "printf 'garbage\n' | ( cd '$r' && node .githooks/trunk-lock-check.mjs hook committed )"
 
 echo "== R10: a check-in cannot loosen the lock's own settings"
 new_repo r10s
@@ -432,6 +433,24 @@ attempt "changing the default branch name" refused "the default branch" change_s
 attempt "lowering the starting number" ok "" change_settings 's/ABC-010/ABC-005/' ABC-084 "feat(ABC-084): x"
 attempt "narrowing the version files" ok "" change_settings 's/`package.json`, //' ABC-085 "feat(ABC-085): x"
 
+echo "== the lock lines are read under either name (Trunk lock, or the older Master lock)"
+lockname=Trunk
+new_repo r10t
+attempt "Trunk label: a change with no record is refused" refused "ABC-020 has no review record" commit_with ABC-020 none "feat(ABC-020): x"
+attempt "Trunk label: a change with a passing record is allowed" ok "" commit_with ABC-021 ok "feat(ABC-021): x"
+check "Trunk label: status says the lock is on" 0 "Trunk lock: ON" status_in
+new_repo r10u ABC master 010 lock
+attempt "Trunk label: a missing starting number is named" refused "Trunk lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
+new_repo r10x ABC master 010 badlock
+attempt "Trunk label: an unreadable starting number is named" refused "Trunk lock starts at" commit_with ABC-020 ok "feat(ABC-020): x"
+lockname=Master
+new_repo r10v
+attempt "relabelling Master to Trunk with the same number is allowed" ok "" change_settings 's/Master lock starts at/Trunk lock starts at/' ABC-090 "feat(ABC-090): x"
+check "after the relabel, status says the lock is on" 0 "Trunk lock: ON" status_in
+attempt "after the relabel, a change with no record is still refused" refused "ABC-091 has no review record" commit_with ABC-091 none "feat(ABC-091): x"
+new_repo r10w
+attempt "relabelling and raising the starting number together is refused" refused "starting number (raised)" change_settings 's/Master lock starts at:\*\* `ABC-010`/Trunk lock starts at:** `ABC-500`/' ABC-092 "feat(ABC-092): x"
+
 echo "== R11: the settings come from CLAUDE.md"
 new_repo r11 XYZ trunk 050
 attempt "below the starting number, other prefix" ok "" commit_with XYZ-049 none "feat(XYZ-049): x"
@@ -440,7 +459,7 @@ attempt "this prefix with a passing record" ok "" commit_with XYZ-051 ok "feat(X
 attempt "the default prefix is not special" refused "carries no XYZ change number" commit_with ABC-060 none "feat(ABC-060): x"
 g switch -q -c master
 attempt "a branch that happens to be called master is not the default here" ok "" commit_with x none "wip"
-files=$(find "$here" -type f ! -name test-master-lock.sh)
+files=$(find "$here" -type f ! -name test-trunk-lock.sh)
 check "no project names in the lock's files" 1 "" grep -nE 'DTP|Disney|tauri|Cargo|package-lock' $files
 check "no hard-coded branch names in the lock's files" 1 "" grep -nE "['\"]master['\"]|['\"]main['\"]|refs/heads/(master|main)" $files
 
@@ -500,7 +519,7 @@ attempt "a fixed failed requirement with no line" refused 'no "Re-review (round 
 attempt "a fixed failed requirement whose line spells the id with a colon" ok "" commit_with ABC-121 v2:failfixedcolon "feat(ABC-121): x"
 attempt "a round with two clean lines" refused 'it needs exactly one' commit_with ABC-122 v2:dupclean "feat(ABC-122): x"
 put_record ABC-123 v2:ok
-check "the gate command refuses a number with another prefix" 1 "not a change number with the prefix ABC" bash -c "cd '$r' && node .githooks/master-lock-check.mjs gate XYZ-123"
+check "the gate command refuses a number with another prefix" 1 "not a change number with the prefix ABC" bash -c "cd '$r' && node .githooks/trunk-lock-check.mjs gate XYZ-123"
 g reset -q --hard
 attempt "fixed lines under the old marker are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-118 v2:oldmarker "feat(ABC-118): x"
 attempt "fixed lines with no marker at all are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-119 v2:nomarker "feat(ABC-119): x"
@@ -516,7 +535,7 @@ attempt "at the number, a record with fixed lines but the old marker is refused"
 attempt "at the number, a format 2 record passes" ok "" commit_with ABC-133 v2:ok "feat(ABC-133): x"
 attempt "above the number, a format 2 record that breaks a rule is refused" refused "latest re-review verdict is a rejection" commit_with ABC-134 v2:rejected "feat(ABC-134): x"
 put_record ABC-135 ok
-check "the gate command applies the requirement too" 1 "not in review format 2" bash -c "cd '$r' && node .githooks/master-lock-check.mjs gate ABC-135"
+check "the gate command applies the requirement too" 1 "not in review format 2" bash -c "cd '$r' && node .githooks/trunk-lock-check.mjs gate ABC-135"
 g reset -q --hard
 new_repo r16b
 attempt "with no such line in CLAUDE.md no format is required" ok "" commit_with ABC-900 ok "feat(ABC-900): x"
@@ -544,16 +563,26 @@ g add -A
 g commit -q -m "chore(ABC-001): init"
 g switch -q -c lock-intro
 mkdir -p "$r/.githooks"
-cp "$here/master-lock-check.mjs" "$here/reference-transaction" "$here/install-master-lock.sh" "$r/.githooks/"
-chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-master-lock.sh"
+cp "$here/trunk-lock-check.mjs" "$here/reference-transaction" "$here/install-trunk-lock.sh" "$r/.githooks/"
+chmod +x "$r/.githooks/reference-transaction" "$r/.githooks/install-trunk-lock.sh"
 printf -- '- **Version files:** `package.json`.\n- **Master lock starts at:** `ABC-010`\n' >> "$r/CLAUDE.md"
 g add -A
-g update-index --chmod=+x .githooks/reference-transaction .githooks/install-master-lock.sh
+g update-index --chmod=+x .githooks/reference-transaction .githooks/install-trunk-lock.sh
 g commit -q -m "chore(ABC-002): add the lock"
 g switch -q master
 g config core.hooksPath .githooks
 attempt "merging the change that adds the lock, once git already finds its hook" ok "" g merge --no-ff -q lock-intro -m "chore(ABC-002): add the lock"
 attempt "an unnumbered commit afterwards" refused "carries no ABC change number" commit_with x none "fix typo"
+
+echo "== a tip from before the rename still counts as holding the lock"
+new_repo r18 ABC master 010 version
+g config --unset core.hooksPath
+g rm -q --cached .githooks/trunk-lock-check.mjs
+cp "$here/trunk-lock-check.mjs" "$r/.githooks/master-lock-check.mjs"
+g add .githooks/master-lock-check.mjs
+g commit -q -m "chore(ABC-003): the checker under its old name"
+g config core.hooksPath .githooks
+attempt "incomplete settings are refused when the tip holds the checker under its old name" refused "settings are incomplete" commit_with ABC-020 ok "feat(ABC-020): x"
 
 echo "== complete settings are enforced whatever the lock's own files"
 # The hook files run from outside the repository here, so the check for the lock's files in the tip
@@ -568,16 +597,16 @@ attempt "an unnumbered commit afterwards is still refused, the settings being co
 
 echo "== R8: the status check"
 new_repo r8
-check "status when the lock is on" 0 "Master lock: ON" status_in
+check "status when the lock is on" 0 "Trunk lock: ON" status_in
 g config --unset core.hooksPath
-check "status with core.hooksPath unset" 1 "Master lock: OFF" status_in
+check "status with core.hooksPath unset" 1 "Trunk lock: OFF" status_in
 g config core.hooksPath elsewhere
 check "status with the wrong hook folder" 1 "not this project's" status_in
 g config core.hooksPath .githooks
 g update-index --chmod=-x .githooks/reference-transaction
 check "status when the hook file is not executable" 1 "not marked executable" status_in
 g update-index --chmod=+x .githooks/reference-transaction
-check "status with the hook file back to executable" 0 "Master lock: ON" status_in
+check "status with the hook file back to executable" 0 "Trunk lock: ON" status_in
 mv "$r/.githooks/reference-transaction" "$r/.githooks/gone"
 check "status with the hook file missing" 1 "reference-transaction is missing" status_in
 mv "$r/.githooks/gone" "$r/.githooks/reference-transaction"
@@ -585,9 +614,9 @@ sed -i '/Master lock starts at/d' "$r/CLAUDE.md"
 check "status with the settings incomplete" 1 "Master lock starts at" status_in
 g checkout -q -- CLAUDE.md
 g config --unset core.hooksPath
-check "the setup script switches the lock on" 0 "Master lock: ON" bash "$r/.githooks/install-master-lock.sh"
+check "the setup script switches the lock on" 0 "Trunk lock: ON" bash "$r/.githooks/install-trunk-lock.sh"
 check "the setup script set the hook folder" 0 ".githooks" g config --get core.hooksPath
-check "the setup script is safe to run again" 0 "Master lock: ON" bash "$r/.githooks/install-master-lock.sh"
+check "the setup script is safe to run again" 0 "Trunk lock: ON" bash "$r/.githooks/install-trunk-lock.sh"
 
 echo "== the gate agrees with the records already merged into this project"
 top=$(git -C "$here" rev-parse --show-toplevel 2>/dev/null)

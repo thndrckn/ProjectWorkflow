@@ -1,7 +1,7 @@
-// Decides whether a Bash/PowerShell command may run while on master/main.
+// Decides whether a Bash/PowerShell command may run while on the default branch (trunk, master or main).
 // Called by block-main-edits.sh with the PreToolUse JSON on stdin and, as arguments:
 //   argv[2]  the main folder (e.g. /d/projects/foo or D:\Projects\Foo)
-//   argv[3]  'master' or 'worktree' (see worktreeMode below)
+//   argv[3]  'main-folder' or 'worktree' (see worktreeMode below)
 //   argv[4]  the main folder in a form git itself understands (for git check-ignore)
 //   argv[5+] the paths of the repository's other worktrees, which are not guarded
 // Prints "allow" or "block: <reason>".
@@ -25,8 +25,8 @@ const proj = normPath(process.argv[2] || '');
 const projForGit = process.argv[4] || '';
 const otherWorktrees = process.argv.slice(5).map(normPath);
 // 'worktree' when the command runs inside a worktree of this project while the main
-// folder (proj) is on master: the worktree's own files are free to change, and only the
-// main folder is protected. Anything else is 'master': proj is the folder being guarded.
+// folder (proj) is on the default branch: the worktree's own files are free to change, and only the
+// main folder is protected. Anything else is 'main-folder': proj is the folder being guarded.
 const worktreeMode = process.argv[3] === 'worktree';
 // Shared-only pass (see the header): proj is then the shared folder, not the project.
 const sharedOnly = process.argv[3] === 'shared';
@@ -141,7 +141,7 @@ function inShared(abs) {
   return [proj, sharedAlt].some((d) => d !== '' && (abs === d || abs.startsWith(d + '/')));
 }
 
-// True when writing to this path is allowed on master.
+// True when writing to this path is allowed on the default branch.
 function destOk(raw) {
   const w = stripQuotes(raw);
   if (sharedOnly) {
@@ -158,7 +158,7 @@ function destOk(raw) {
   if (n.startsWith('/')) n = path.posix.normalize(n); // collapse any .. before comparing
   if (isPlanFile(n)) return true;
   if (n.startsWith('/')) return !inMain(n);
-  // Relative: inside the project on master. In a worktree it lands in the worktree itself,
+  // Relative: inside the project on the default branch. In a worktree it lands in the worktree itself,
   // unless it climbs out with '..' (which could reach the main folder).
   return worktreeMode && !n.includes('..');
 }
@@ -295,7 +295,7 @@ function worktreeDestOk(raw) {
     return n !== proj && ignoredInMain(n.slice(proj.length + 1));
   }
   if (w.includes('..')) return false;
-  // Relative: inside the main folder on master, and inside the worktree in a worktree.
+  // Relative: inside the main folder on the default branch, and inside the worktree in a worktree.
   return worktreeMode || ignoredInMain(path.posix.normalize(n));
 }
 
@@ -338,7 +338,7 @@ function parseGlobals(args) {
 // In a worktree, true when a git global option points git at the main folder (-C,
 // --git-dir, --work-tree) or could move its working tree (-c / --config-env on
 // core.worktree or core.bare), at something that can't be resolved, or isn't recognised,
-// so the master rules apply to the command.
+// so the default-branch rules apply to the command.
 function redirectsIntoMain({ opts, unknown }) {
   if (unknown) return true;
   for (const [name, value] of opts) {
@@ -359,7 +359,7 @@ function isForce(rest) {
   return rest.some((a) => isLong(a, '--force') || (/^-[a-zA-Z]+$/.test(a) && a.includes('f')));
 }
 
-const DEFAULT_BRANCHES = ['master', 'main', 'refs/heads/master', 'refs/heads/main'];
+const DEFAULT_BRANCHES = ['trunk', 'master', 'main', 'refs/heads/trunk', 'refs/heads/master', 'refs/heads/main'];
 
 // In a worktree, the commands that could still reach the default branch, whose work
 // lives in the main folder, even though git itself runs inside the worktree.
@@ -380,7 +380,7 @@ function worktreeRefRule(sub, rest) {
   }
   if (sub === 'fetch') {
     // fetch <remote> <src>:<dst> updates a local branch; with -u/--update-head-ok that can
-    // be the checked-out default branch. Plain `fetch origin master` only updates origin/master.
+    // be the checked-out default branch. Plain `fetch origin trunk` only updates origin/trunk.
     for (const r of nonOpt.slice(1)) {
       if (!r.includes(':')) continue;
       if (DEFAULT_BRANCHES.includes(r.replace(/^\+/, '').split(':').pop())) return 'git fetch into the default branch from a worktree';
@@ -406,20 +406,20 @@ function worktreeRefRule(sub, rest) {
   return null;
 }
 
-// The master lock (the project's tracked hooks folder) is switched on by git's
+// The trunk lock (the project's tracked hooks folder) is switched on by git's
 // core.hooksPath, so changing that setting switches the lock off. That is a step only the
-// user takes, in their own terminal (see CLAUDE.md, "Master lock"), so it is blocked in
+// user takes, in their own terminal (see CLAUDE.md, "Trunk lock"), so it is blocked in
 // every mode: git -c / --config-env, and git config writes. Reading it stays allowed.
 const HOOKS_PATH = /^core\.hookspath\b/i;
 const GIT_CONFIG_ENV = /^(?:\$env:)?GIT_CONFIG_(?:COUNT|PARAMETERS|KEY_\d+|VALUE_\d+|GLOBAL|SYSTEM|NOSYSTEM)(?:=|$)/i;
-function masterLockRule({ opts }, sub, rest) {
+function trunkLockRule({ opts }, sub, rest) {
   for (const [name, value] of opts) {
-    if ((name === '-c' || name === '--config-env') && HOOKS_PATH.test(stripQuotes(value))) return 'git -c core.hooksPath would switch the master lock off';
+    if ((name === '-c' || name === '--config-env') && HOOKS_PATH.test(stripQuotes(value))) return 'git -c core.hooksPath would switch the trunk lock off';
   }
   if (sub === 'config' && rest.some((a) => /^core\.hookspath$/i.test(a))) {
     const words = rest.filter((a) => !a.startsWith('-'));
     const isRead = rest.some((a) => CONFIG_READ.has(a)) || words[0] === 'get';
-    if (!isRead && (rest.some((a) => CONFIG_WRITE.has(a)) || words.length >= 2)) return 'git config core.hooksPath would switch the master lock off';
+    if (!isRead && (rest.some((a) => CONFIG_WRITE.has(a)) || words.length >= 2)) return 'git config core.hooksPath would switch the trunk lock off';
   }
   return null;
 }
@@ -429,7 +429,7 @@ function gitCheck(args) {
   const i = globals.next;
   const sub = stripQuotes(args[i] || '');
   const rest = args.slice(i + 1).map(stripQuotes);
-  const lockOff = masterLockRule(globals, sub, rest);
+  const lockOff = trunkLockRule(globals, sub, rest);
   if (lockOff) return lockOff;
   if (worktreeMode && !redirectsIntoMain(globals)) {
     // Git inside the worktree is free, apart from the few commands that reach the default
@@ -566,7 +566,7 @@ function segmentCheck(words, depth) {
   }
   // The shared-only pass judges writers and cd only; git is left to the normal pass.
   if (!sharedOnly && worktreeMode && gitEnvIntoMain(ws)) return 'git pointed at the main folder through the environment';
-  if (!sharedOnly && ws.some((w) => GIT_CONFIG_ENV.test(stripQuotes(w)))) return 'git settings given through the environment could switch the master lock off';
+  if (!sharedOnly && ws.some((w) => GIT_CONFIG_ENV.test(stripQuotes(w)))) return 'git settings given through the environment could switch the trunk lock off';
   const i = commandIndex(ws);
   if (i >= ws.length) return null;
   const name = stripQuotes(ws[i]).replace(/\\/g, '/').split('/').pop().toLowerCase().replace(/\.exe$/, '');
@@ -635,7 +635,7 @@ process.stdin.on('data', (d) => (s += d)).on('end', () => {
   try {
     command = String((JSON.parse(s).tool_input || {}).command || '');
   } catch (e) {
-    // Unparseable input on master: fail closed.
+    // Unparseable input on the default branch: fail closed.
     process.stdout.write('block: could not read the command');
     return;
   }

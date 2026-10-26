@@ -19,7 +19,7 @@ A change is normally coded in its own worktree, and `/commit-change` is typed in
 - Confirm the branch has commits that the default branch doesn't (`git log <default>..HEAD --oneline`). If not, STOP.
 - Confirm there are no uncommitted changes. If there are, show them and STOP.
 - Fetch from GitHub and confirm the default branch matches `origin/<default>`. If it doesn't, STOP and tell the user in plain English.
-- If CLAUDE.md has a "Master lock" line, run the status command it names, in the folder you are in. If it says the lock is off, STOP and tell the user in plain English to switch it on as CLAUDE.md says (a step for them to take). If CLAUDE.md has no such line, skip this.
+- If CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line), run the status command it names, in the folder you are in. If it says the lock is off, STOP and tell the user in plain English to switch it on as CLAUDE.md says (a step for them to take). If CLAUDE.md has no such line, skip this.
 
 ## 2. Confirm the records are in place
 Find the plan for this branch in `docs/plans/` (its change number is in the branch name). Then check:
@@ -30,7 +30,7 @@ Find the plan for this branch in `docs/plans/` (its change number is in the bran
 If anything is missing or the plan changed, STOP and tell the user exactly what's wrong. Do not write or fix the records yourself; that is `/code-change`'s job.
 
 ### Review gate
-If CLAUDE.md has a "Master lock" line, first run the checker's gate command it names for this change number (`gate <NUMBER>`; it is the same code the lock applies when the branch reaches the default branch, so the two cannot disagree). Its failures are failures of the rules below. Still read the record yourself against the rules, which stay the specification; if your reading and the checker disagree, STOP, say so in plain English and let the user decide, because the lock would refuse the same merge.
+If CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line), first run the checker's gate command it names for this change number (`gate <NUMBER>`; it is the same code the lock applies when the branch reaches the default branch, so the two cannot disagree). Its failures are failures of the rules below. Still read the record yourself against the rules, which stay the specification; if your reading and the checker disagree, STOP, say so in plain English and let the user decide, because the lock would refuse the same merge.
 
 Read the review record. The gate applies only to a record in the new format: one with a line that starts `- **Review format:** accountability` in its header, or with any line that starts (after any leading spaces) `**Caused by this change:**` (so deleting the marker doesn't dodge the gate). Prose that merely mentions the phrase mid-line doesn't count. A record with neither is in the old format and is exempt; say so in one line and go on to step 3.
 
@@ -56,7 +56,7 @@ If the change is in a worktree, add that the worktree is deleted at the end with
 
 ## 4. Catch up with the default branch
 Only needed if the default branch has commits the working branch doesn't (`git log HEAD..<default> --oneline` is not empty). If it is empty, skip this step.
-- Bring the branch up to date by merging the default branch into it with a message that carries the change number: `git merge <default> -m "chore(<NUMBER>): catch up with <default>"`. Never rebase: the approved-plan commit must keep its hash. Every merge or correction commit made on the branch carries the change number like this, because a commit with no number is refused when the branch reaches the default branch (the master lock, if CLAUDE.md has a "Master lock" line).
+- Bring the branch up to date by merging the default branch into it with a message that carries the change number: `git merge <default> -m "chore(<NUMBER>): catch up with <default>"`. Never rebase: the approved-plan commit must keep its hash. Every merge or correction commit made on the branch carries the change number like this, because a commit with no number is refused when the branch reaches the default branch (the trunk lock, if CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line)).
 - If the merge reports any conflict, list the conflicted files (`git diff --name-only --diff-filter=U`).
   - **Only `CHANGELOG.md` conflicts**, and this change's own diff to it adds nothing but this change's entry (`git diff <merge-base> HEAD -- CHANGELOG.md` shows only added lines belonging to this change number): changes in flight at the same time all add their line at the top of Unreleased, so this is expected. Resolve it yourself: take the default branch's version of the file (`git checkout --theirs CHANGELOG.md`), add this change's entry (taken from `git show HEAD:CHANGELOG.md`, exactly as written) at the top of its `## [Unreleased]` list, and stage it. Then check that `git diff <default> -- CHANGELOG.md` shows only this change's entry as added, and finish the merge commit with the same message, `chore(<NUMBER>): catch up with <default>`. Tell the user in one plain line that you kept both entries.
   - **Anything else** (another file as well, or a CHANGELOG change that is more than this change's entry): run `git merge --abort`, STOP, and tell the user in plain English which files conflict. Ask how they want to proceed. Do not guess a resolution.
@@ -67,7 +67,7 @@ Only needed if the default branch has commits the working branch doesn't (`git l
 
 ## 5. Merge and publish
 - If the work is in a worktree: the default branch can only be merged in the main folder, and a chat inside a worktree can't touch it. Note the worktree's path, make sure `ExitWorktree` is loaded (if it isn't, load it with `ToolSearch`, `select:ExitWorktree`), then leave the worktree with it (`keep`), which returns the chat to the main folder. If the chat can't leave the worktree that way (for example it was resumed), STOP and tell the user to type `/commit-change` from a chat in the main folder, naming the change.
-- In the main folder, if the default branch's CLAUDE.md has a "Master lock" line, run its status command there too and STOP if it says the lock is off, exactly as in step 1. If it has no such line, skip this.
+- In the main folder, if the default branch's CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line), run its status command there too and STOP if it says the lock is off, exactly as in step 1. If it has no such line, skip this.
 - In the main folder, make sure the default branch is the one checked out and merge with `git merge --no-ff <branch>`, using the plan's commit message for the merge commit. If the merge reports a conflict, run `git merge --abort`, STOP, and tell the user in plain English. Do not push or delete anything.
 - Push the default branch to GitHub. If the push is rejected, STOP and tell the user in plain English. Do not delete the branch or the worktree, and do not force-push; say that the local default branch is ahead of GitHub.
 - Only after the push succeeds, remove the worktree, if there is one, with `git worktree remove <path>` (never forced), then delete the working branch with `git branch -d <branch>` (never `-D`). The removal deletes everything inside the worktree folder, including its own installed packages, build folder and database, and nothing outside it. If it can't finish (for example a file is locked because the worktree's app or an editor is still open), do not force it: say plainly what is left and what the user must close or delete by hand, and still delete the branch only if the worktree is gone.
@@ -85,7 +85,7 @@ Tell the user in plain English:
 - Write or change the plan, the review record, or the CHANGELOG entry. The exceptions are the merge-conflict section in step 4 and keeping both entries when only `CHANGELOG.md` conflicts in the catch-up merge. If anything else is wrong, STOP and say so.
 - Rebase.
 - Make a merge or correction commit on the branch whose message has no change number.
-- Turn the master lock off, or set `core.hooksPath` in any way. If the lock refuses the merge, STOP and tell the user in plain English what it said; the cause goes back through `/code-change`.
+- Turn the trunk lock off, or set `core.hooksPath` in any way. If the lock refuses the merge, STOP and tell the user in plain English what it said; the cause goes back through `/code-change`.
 - Push any branch other than the default branch, or force-push anything.
 - Force-remove a worktree, or delete anything outside the worktree's own folder.
 - Run anything against files in the data folder (CLAUDE.md's "Data folder" line).
