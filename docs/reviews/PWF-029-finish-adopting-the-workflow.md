@@ -88,11 +88,15 @@ The re-reviewer accepted every outcome above and raised the two Nits at the end,
 **Re-review clean:** no
 **Decided by:** Jason
 
+Two fixes were made after the re-review, authorised by Jason while he checked R5, and not checked by a further reviewer:
+- POLICY.md "Peer review", Record paragraph: restored "Every finding is recorded, whatever its disposition; the record shows what was checked and decided, not just what was changed", and that the record lists deviations from the plan and ends with a short summary. Both had been dropped by edit 5.
+- POLICY.md "Committing", check-in bullet: it said "Nothing is pushed until the user says so", but `/merge-change` pushes the default branch itself (and stops without force-pushing if the push is rejected). Claude changed POLICY.md to match the skill: the bullet now says `/merge-change` merges with `--no-ff`, pushes the default branch, and removes the worktree and branch, and stops if the push is rejected. The skill was not changed.
+
 ## Requirements trace
 | Requirement | Test | Result |
 |---|---|---|
-| R1 | Manual: `docs/agents/` holds `issue-tracker.md` (local markdown), `domain.md` and `triage-labels.md`, byte-identical to Matt's seed files (the Standards reviewer also checked this) | Manual |
-| R2 | Manual: CLAUDE.md differs from the plan commit only by the Agent skills block, the PowerShell lines and the Records line (the Spec reviewer also checked this) | Manual |
+| R1 | Manual: `docs/agents/` holds `issue-tracker.md` (local markdown), `domain.md` and `triage-labels.md`, byte-identical to Matt's seed files (the Standards reviewer also checked this) | Pass (checked by Jason) |
+| R2 | Manual: CLAUDE.md differs from the plan commit only by the Agent skills block, the PowerShell lines and the Records line (the Spec reviewer also checked this) | Pass (checked by Jason) |
 | R3 | New `test-adopt.sh` case runs adopt.sh on a project holding this repo's own CLAUDE.md and `docs/agents/issue-tracker.md` and expects "Done"; 10 passed, 0 failed | Pass |
 | R4 | grep: `/plan-change` and `/commit-change` appear 0 times in `docs/POLICY.md`; `/design-change` 3, `/plan-small-change` 3, `/plan-large-change` 3, `/code-change` 5, `/merge-change` 2, `/build-changes` 2 | Pass |
 | R5 | Manual: Peer review reads against `docs/workflow-v2.md` (Light/Full by merge danger, one narrow re-review, no `Review format` marker, user decides disputes) | Manual |
@@ -101,8 +105,9 @@ The re-reviewer accepted every outcome above and raised the two Nits at the end,
 | R7 | The four checks from CLAUDE.md, each run as its own command: trunk lock 37 passed; guard 9 passed; adopt 10 passed; `claude plugin validate .` passed with the expected warnings | Pass |
 
 ## Deviations from the plan
-- `docs/POLICY.md` "Rules for plans and skills" rule 4 (the "Policy edits for you to make by hand" rule) was removed. It was not on the plan's edit list, and R5a could not pass with it in place.
-- The "When to stop and ask the user" paragraph in POLICY.md Peer review was rewritten to three cases (it still described rounds). It was not on the plan's edit list.
+- `docs/POLICY.md` "Rules for plans and skills" rule 4 (the "Policy edits for you to make by hand" rule) was removed. It was not on the plan's edit list, and R5a could not pass with it in place. Accepted by Jason.
+- The "When to stop and ask the user" paragraph in POLICY.md Peer review was rewritten to three cases (it still described rounds). It was not on the plan's edit list. Accepted by Jason.
+- Edit 4's check-in wording ("Nothing is pushed until the user says so") and edit 5's Record paragraph were changed after the re-review, as described under Re-review.
 - "editing CLAUDE.md by hand" in POLICY.md's Committing section was reworded to "changing CLAUDE.md directly", so that R5a's search comes out clean.
 - The sentence "A failed requirement test is not a reviewer finding; it can only be fixed." was kept in Settling findings; edit 5's text did not have it.
 - `test-adopt.sh` gained a case (R3). The plan named it as the test, so this is not a scope change.

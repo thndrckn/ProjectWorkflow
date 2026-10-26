@@ -150,7 +150,7 @@ Do not perform any "cleanup," "reorganization," or file removal anywhere in the 
 ## Committing
 - Work is committed on its own branch as it's built. Branch commits stay on your computer; they aren't pushed.
 - Nothing is ever committed directly to the default branch. Code edits there are blocked by a hook.
-- A change is **checked in** when `/merge-change` merges its branch into the default branch. Nothing is pushed until the user says so.
+- A change is **checked in** when `/merge-change` merges its branch into the default branch (`--no-ff`), pushes the default branch, and removes the worktree and branch. If the push is rejected it stops; it never force-pushes.
 - Manual edits (for example, changing CLAUDE.md directly) are checked in the same way: plan them as a change, and `/code-change` carries them onto a branch.
 
 ---
@@ -199,7 +199,7 @@ Every commit message includes the change number as its scope, for example `feat(
 
 **When to stop and ask the user:** only when (1) a fix would go against the approved plan, (2) a fix would touch the user's data, whatever the finding's severity (migrations, delete behaviour, import/export/backup code, or the data directory), or (3) the re-reviewer rejects an outcome the author still stands by. The plan wins over any finding.
 
-**Record:** each change (and each ticket) gets a review record at `docs/reviews/<number>-<title>.md` with the level, the findings and their outcomes, who decided any dispute, and a trace table (requirement, test, result). The trunk lock checks the record is complete before the default branch moves. It cannot prove the user made a decision; the user's approval of the review is that proof.
+**Record:** each change (and each ticket) gets a review record at `docs/reviews/<number>-<title>.md` with the level, the findings and their outcomes, who decided any dispute, and a trace table (requirement, test, result), then any deviations from the plan, and it ends with a short summary. Every finding is recorded, whatever its disposition; the record shows what was checked and decided, not just what was changed. The trunk lock checks the record is complete before the default branch moves. It cannot prove the user made a decision; the user's approval of the review is that proof.
 
 ---
 
