@@ -116,7 +116,7 @@ function findingBlocks(body) {
     const text = block.join('\n');
     // A bullet is a finding if it has the severity form or a finding's own labelled line, so one
     // written without the severity form is refused, not skipped.
-    if (/^- \*\*?\[[^\]]*\]/.test(text) || /\*\*(?:Caused by this change|Outcome):\*\*/.test(text)) blocks.push(text);
+    if (/^- \*{0,2}\[(?:High|Medium|Low|Nit|Informational)\]/.test(text) || /\*\*(?:Caused by this change|Outcome):\*\*/.test(text)) blocks.push(text);
   }
   return blocks;
 }
@@ -314,7 +314,7 @@ function lockPresentAt(tip) {
   }
   // A checker that lives outside the project (adopt.sh points git at the plugin's release/ folder)
   // was switched on on purpose, so the lock counts as present: its fail-closed checks apply.
-  if (ownRel.startsWith('..')) return true;
+  if (path.isAbsolute(ownRel) || ownRel === '..' || ownRel.startsWith('../')) return true;
   return gitTry(['cat-file', '-e', `${tip}:${ownRel}`]) !== null;
 }
 
