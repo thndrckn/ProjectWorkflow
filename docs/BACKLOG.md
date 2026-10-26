@@ -42,8 +42,20 @@ Entry format:
 - **Files:** `docs/workflow-v2.md`, `skills/code-change/SKILL.md`
 - **What's wrong:** The workflow allows one narrow re-review. If that re-review rejects a fix or raises something new, the fixes made after it are checked by nobody, and the record can only say the round was not clean and that Jason decided. Consider a narrow check of those fixes when they are to the lock or guard.
 
-## docs/POLICY.md still describes the old commands
-- **Found in:** PWF-028
-- **Severity:** Low
+## POLICY.md's Light review leaves out "each kept short"
+- **Found in:** PWF-029
+- **Severity:** Nit
 - **Files:** `docs/POLICY.md`
-- **What's wrong:** docs/POLICY.md still describes the old commands; update it (planned as PWF-029).
+- **What's wrong:** `docs/workflow-v2.md` says the Light reviewers (Standards and Spec) are each kept short; the Depth paragraph in POLICY.md's Peer review does not say so. Found by the PWF-029 review; PWF-029 did not cause it.
+
+## CLAUDE.md's "never push until Jason says so" does not say what counts as the go-ahead
+- **Found in:** PWF-029
+- **Severity:** Low
+- **Files:** `CLAUDE.md`
+- **What's wrong:** The Rules say never to push until Jason says so, but `/merge-change` pushes the default branch itself. The rule should say that Jason typing `/merge-change` is that go-ahead. Raised by Jason while checking PWF-029.
+
+## adopt.sh and the lock check disagree on what "lock on" means in this repo
+- **Found in:** PWF-029
+- **Severity:** Low
+- **Files:** `adopt.sh`, `githooks/trunk-lock-check.mjs`, `CLAUDE.md`
+- **What's wrong:** In a project, `adopt.sh` points git at `release/githooks`. In ProjectWorkflow itself the lock check (`status`, and so `/merge-change`) only accepts the repo's own `githooks` folder, so it reads OFF when `release/githooks` is set, and `/merge-change` stops. Decide which this repo should use and make `adopt.sh`, the check and CLAUDE.md agree. Planned as PWF-030. Raised by Jason while running `/merge-change` for PWF-029.

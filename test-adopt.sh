@@ -50,6 +50,13 @@ installs=$(grep -c "plugin install" "$tmp/log")
 expect 0 "Done" "ends done once Matt's setup exists" bash "$pw/adopt.sh" "$proj"
 [ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: running again installs nothing twice"; }
 
+# This repo's own CLAUDE.md and Matt's setup file are accepted as a finished project (PWF-029).
+# adopt.sh only reads those two files from the project, plus needs a git repo, so that is all the stand-in holds.
+own="$tmp/own"; git init -q -b trunk "$own"; mkdir -p "$own/docs/agents"
+cp "$here/CLAUDE.md" "$own/"; cp "$here/docs/agents/issue-tracker.md" "$own/docs/agents/"
+git -C "$own" add -A; git -C "$own" commit -q -m "chore(PWF-001): init"
+expect 0 "Done" "this repo's own CLAUDE.md and setup file are accepted" bash "$pw/adopt.sh" "$own"
+
 echo "mattpocock-skills@claude-plugins-official" >> "$state"
 expect 1 "plugin uninstall mattpocock-skills@claude-plugins-official" "stops while the official copy is installed" bash "$pw/adopt.sh" "$proj"
 
