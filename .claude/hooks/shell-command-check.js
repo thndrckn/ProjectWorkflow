@@ -574,7 +574,8 @@ function segmentCheck(words, depth) {
 
   if (sharedOnly && CD_COMMANDS.has(name)) {
     const d = stripQuotes(destinations('first-path', args)[0] || '');
-    if (d === '' || /[$%`]/.test(d) || d[0] === '~') { sharedCwd = null; return null; }
+    // No target, a variable, ~ and "cd -" (the previous directory) can't be followed.
+    if (d === '' || d === '-' || /[$%`]/.test(d) || d[0] === '~') { sharedCwd = null; return null; }
     const abs = sharedResolve(normPath(d));
     if (abs !== null && inShared(abs)) return `${name} into the shared conventions folder`;
     sharedCwd = abs;

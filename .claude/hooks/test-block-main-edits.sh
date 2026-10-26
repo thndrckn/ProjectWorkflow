@@ -263,6 +263,10 @@ for repo in "$master" "$feature"; do
   bothc "R11 $(basename "$repo") blocks a write after a cd chain into the folder" 2 "$repo" "$other" "cd .. && cd shared-conventions && echo hi > POLICY.md"
   bothc "R11 $(basename "$repo") blocks a write after a cd that lands in the folder" 2 "$repo" "$other" "cd ../shared-conventions; touch X.md"
 done
+# "cd -" can't be followed, so relative writes after it are unplaced (allowed, best effort),
+# but a write by absolute path, or a cd by absolute path into the folder, is still caught.
+bothc "R11 feature project: relative write after cd - is not placed (documented gap)" 0 "$feature" "$other" "cd - && echo hi > POLICY.md"
+bothc "R11 feature project: absolute write after cd - still blocked" 2 "$feature" "$other" "cd - && echo hi > $shared/POLICY.md"
 bothc "R11 feature project: relative write in an unrelated cwd still allowed" 0 "$feature" "$other" "echo hi > local.txt"
 bothc "R11 feature project: a sibling folder whose name starts the same is not blocked" 0 "$feature" "$other" "echo hi > ../shared-conventions-x/a.txt"
 # Not just the master: a feature branch still edits its own files.
