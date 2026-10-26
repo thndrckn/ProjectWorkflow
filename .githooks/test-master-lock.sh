@@ -18,10 +18,10 @@ r=""; def=master; pfx=ABC
 
 g() { git -C "$r" "$@"; }
 
-# new_repo <name> [prefix] [default branch] [start number] [omit: prefix|lock|version|badlock]
+# new_repo <name> [prefix] [default branch] [start number] [omit: prefix|lock|version|badlock|claude] [review format 2 start number]
 # A repo whose first commit predates the lock being switched on, like a real project.
 new_repo() {
-  local name=$1 p=${2:-ABC} d=${3:-master} s=${4:-010} omit=${5:-}   # omit: prefix|lock|version|badlock|claude
+  local name=$1 p=${2:-ABC} d=${3:-master} s=${4:-010} omit=${5:-} f2=${6:-}   # omit: prefix|lock|version|badlock|claude
   r="$tmp/$name"; def=$d; pfx=$p
   git init -q -b "$d" "$r"
   mkdir -p "$r/.githooks" "$r/docs/reviews"
@@ -33,6 +33,7 @@ new_repo() {
     [ "$omit" = version ] || printf -- '- **Version files:** `package.json`, `app/version.txt`. Lockfiles are regenerated.\n'
     if [ "$omit" = badlock ]; then printf -- '- **Master lock starts at:** `%s-1x`\n' "$p"
     elif [ "$omit" != lock ]; then printf -- '- **Master lock starts at:** `%s-%s`\n' "$p" "$s"; fi
+    [ -z "$f2" ] || printf -- '- **Review format 2 required from:** `%s-%s`\n' "$p" "$f2"
   } > "$r/CLAUDE.md"
   [ "$omit" != claude ] || rm "$r/CLAUDE.md"
   printf '{}\n' > "$r/package.json"; mkdir -p "$r/app" "$r/src"; printf '1\n' > "$r/app/version.txt"
@@ -118,10 +119,145 @@ Round clean: yes.
     "$n" "$n" "$finding" "$rereview" "$result"
 }
 
+# mk_record2 <number> <variant>: a review record in review format 2 (the fixed re-review lines),
+# broken in one way. The variant "oldmarker" keeps the lines but writes the old header marker.
+mk_record2() {
+  local n=$1 v=$2 marker="accountability 2" trace=Pass
+  local f1="- **[Low]** a thing — f.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (how)
+  **Re-review (round 1):** accepted"
+  local f2=""
+  local rereview="## Re-review
+
+### Round 1
+Checked the fix. **Round 1 clean:** yes
+"
+  case $v in
+    ok) ;;
+    nofindings) f1=""; rereview="" ;;
+    noverdict) f1="- **[Low]** a thing — f.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (how)" ;;
+    rejected) f1="${f1/accepted/rejected}"
+      rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+" ;;
+    rejthenacc) f1="- **[Low]** a thing — f.js
+  **Caused by this change:** yes
+  **Disposition:** fixed (how)
+  **Re-review (round 1):** rejected
+  **Re-review (round 2):** accepted"
+      rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+
+### Round 2
+**Round 2 clean:** yes
+" ;;
+    cleanwithrej) f1="${f1/accepted/rejected}" ;;
+    cleanwithnew) f2="- **[Low]** another thing — g.js
+  **Caused by this change:** yes
+  **Raised in round:** 1
+  **Disposition:** fixed (how)
+  **Re-review (round 2):** accepted"
+      rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** yes
+
+### Round 2
+**Round 2 clean:** yes
+" ;;
+    verdictbeforeraised) f2="- **[Low]** another thing — g.js
+  **Caused by this change:** yes
+  **Raised in round:** 2
+  **Disposition:** fixed (how)
+  **Re-review (round 2):** accepted"
+      rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+
+### Round 2
+**Round 2 clean:** no
+
+### Round 3
+**Round 3 clean:** yes
+" ;;
+    notclean) rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+" ;;
+    noroundline) rereview="## Re-review
+
+### Round 1
+It accepted every fix and raised no new finding.
+" ;;
+    settledunclean) rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+**Settled by the user:** \"fine as it is\"
+" ;;
+    settledfinding) f1="- **[Low]** a thing — f.js
+  **Caused by this change:** yes
+  **Disposition:** logged in docs/BACKLOG.md
+  **Settled by the user:** \"fine as it is\"" ;;
+    unknownround) f1="${f1/round 1/round 7}" ;;
+    norereview) rereview="" ;;
+    round4) rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** no
+
+### Round 2
+**Round 2 clean:** no
+
+### Round 3
+**Round 3 clean:** no
+
+### Round 4
+**Round 4 clean:** yes
+" ;;
+    failfixed) f1=""; trace="Pass (fixed after Fail)"
+      rereview="## Re-review
+
+### Round 1
+**Re-review (round 1):** R1 accepted
+**Round 1 clean:** yes
+" ;;
+    failfixedrej) f1=""; trace="Pass (fixed after Fail)"
+      rereview="## Re-review
+
+### Round 1
+**Re-review (round 1):** R1 rejected
+**Round 1 clean:** no
+" ;;
+    failfixednoline) f1=""; trace="Pass (fixed after Fail)"
+      rereview="## Re-review
+
+### Round 1
+Checked the fix. **Round 1 clean:** yes
+" ;;
+    oldmarker) marker=accountability; f1="${f1/\*\*Re-review (round 1):\*\* accepted/}" ;;
+    nomarker) marker=none; f1="${f1/\*\*Re-review (round 1):\*\* accepted/}" ;;
+  esac
+  [ "$v" != nomarker ] || { printf '# Review: %s — t\n\n- **Change:** %s\n- **Plan:** x\n\n## Findings\n\n%s\n\n%s\n\n%s\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n| R1 | t | %s |\n' "$n" "$n" "$f1" "$f2" "$rereview" "$trace"; return; }
+  printf '# Review: %s — t\n\n- **Change:** %s\n- **Review format:** %s\n- **Plan:** x\n\n## Findings\n\n%s\n\n%s\n\n%s\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n| R1 | t | %s |\n' \
+    "$n" "$n" "$marker" "$f1" "$f2" "$rereview" "$trace"
+}
+
 # put_record <number> <variant|old>: writes the record into the working tree and stages it.
+# A variant written "v2:<name>" is a review format 2 record (mk_record2).
 put_record() {
   mkdir -p "$r/docs/reviews"
   if [ "$2" = old ]; then printf '# Review: %s\n\nOld style record, no accountability marker.\n' "$1" > "$r/docs/reviews/$1-x.md"
+  elif [ "${2#v2:}" != "$2" ]; then mk_record2 "$1" "${2#v2:}" > "$r/docs/reviews/$1-x.md"
   else mk_record "$1" "$2" > "$r/docs/reviews/$1-x.md"; fi
   g add -A
 }
@@ -275,7 +411,7 @@ check "a state other than prepared is ignored" 0 "" bash -c "printf 'garbage\n' 
 echo "== R10: a check-in cannot loosen the lock's own settings"
 new_repo r10s
 # change_settings <sed expression> <number> <message>: a numbered change with a passing record that also edits CLAUDE.md
-change_settings() { sed -i "$1" "$r/CLAUDE.md"; commit_with "$2" ok "$3"; }
+change_settings() { sed -i "$1" "$r/CLAUDE.md"; commit_with "$2" "${cs_variant:-ok}" "$3"; }
 attempt "raising the starting number" refused "starting number (raised)" change_settings 's/ABC-010/ABC-500/' ABC-080 "feat(ABC-080): x"
 attempt "adding a version file" refused "added src/a.txt" change_settings 's/`app\/version.txt`/`app\/version.txt`, `src\/a.txt`/' ABC-081 "feat(ABC-081): x"
 attempt "changing the change prefix" refused "" change_settings 's/`ABC`/`XYZ`/' ABC-082 "feat(ABC-082): x"
@@ -327,6 +463,60 @@ g merge -q master --no-edit
 g switch -q master
 attempt "a branch with git's unnumbered catch-up merge" refused "Merge branch 'master' into work-b" g merge --no-ff -q work-b -m "feat(ABC-072): merge"
 g merge --abort 2>/dev/null; g reset -q --hard
+
+echo "== R15: review format 2 records are read by their fixed lines"
+new_repo r15
+attempt "a format 2 record, every verdict accepted and the last round clean" ok "" commit_with ABC-100 v2:ok "feat(ABC-100): x"
+attempt "a format 2 record with no findings and no rounds" ok "" commit_with ABC-101 v2:nofindings "feat(ABC-101): x"
+attempt "a finding with no re-review line" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-102 v2:noverdict "feat(ABC-102): x"
+attempt "a finding whose latest verdict is a rejection" refused "latest re-review verdict is a rejection" commit_with ABC-103 v2:rejected "feat(ABC-103): x"
+attempt "a rejection that a later round accepted" ok "" commit_with ABC-104 v2:rejthenacc "feat(ABC-104): x"
+attempt "a round marked clean that records a rejection" refused "marked clean but records a rejection" commit_with ABC-105 v2:cleanwithrej "feat(ABC-105): x"
+attempt "a round marked clean that raised a new finding" refused "marked clean but raised a new finding" commit_with ABC-106 v2:cleanwithnew "feat(ABC-106): x"
+attempt "a verdict from the round that raised the finding" refused "cannot have checked it" commit_with ABC-107 v2:verdictbeforeraised "feat(ABC-107): x"
+attempt "a last round that says clean: no" refused "did not finish" commit_with ABC-108 v2:notclean "feat(ABC-108): x"
+attempt "a round with no clean line" refused 'has no "Round 1 clean: yes/no" line' commit_with ABC-109 v2:noroundline "feat(ABC-109): x"
+attempt "a round that is not clean but is settled by the user" ok "" commit_with ABC-110 v2:settledunclean "feat(ABC-110): x"
+attempt "a finding settled by the user needs no verdict" ok "" commit_with ABC-111 v2:settledfinding "feat(ABC-111): x"
+attempt "a verdict naming a round that is not recorded" refused "which is not recorded" commit_with ABC-112 v2:unknownround "feat(ABC-112): x"
+attempt "findings but no re-review round" refused "no re-review round is recorded" commit_with ABC-113 v2:norereview "feat(ABC-113): x"
+attempt "a fourth round not authorised" refused "beyond the third" commit_with ABC-114 v2:round4 "feat(ABC-114): x"
+attempt "a fixed failed requirement with its accepted line" ok "" commit_with ABC-115 v2:failfixed "feat(ABC-115): x"
+attempt "a fixed failed requirement whose latest verdict is a rejection" refused "latest re-review verdict is a rejection" commit_with ABC-116 v2:failfixedrej "feat(ABC-116): x"
+attempt "a fixed failed requirement with no line" refused 'no "Re-review (round N): R1 accepted" line' commit_with ABC-117 v2:failfixednoline "feat(ABC-117): x"
+attempt "fixed lines under the old marker are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-118 v2:oldmarker "feat(ABC-118): x"
+attempt "fixed lines with no marker at all are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-119 v2:nomarker "feat(ABC-119): x"
+attempt "an old-format record keeps its keyword reading" ok "" commit_with ABC-120 cleanmention "feat(ABC-120): x"
+
+echo "== R16: the format 2 requirement"
+new_repo r16 ABC master 010 "" 130
+attempt "below the number, an old-marker record still passes" ok "" commit_with ABC-129 ok "feat(ABC-129): x"
+attempt "below the number, a record with no marker still passes" ok "" commit_with ABC-128 old "feat(ABC-128): x"
+attempt "at the number, an old-marker record is refused" refused "not in review format 2" commit_with ABC-130 ok "feat(ABC-130): x"
+attempt "at the number, a record with no marker is refused" refused "not in review format 2" commit_with ABC-131 old "feat(ABC-131): x"
+attempt "at the number, a record with fixed lines but the old marker is refused" refused "not in review format 2" commit_with ABC-132 v2:oldmarker "feat(ABC-132): x"
+attempt "at the number, a format 2 record passes" ok "" commit_with ABC-133 v2:ok "feat(ABC-133): x"
+attempt "above the number, a format 2 record that breaks a rule is refused" refused "latest re-review verdict is a rejection" commit_with ABC-134 v2:rejected "feat(ABC-134): x"
+put_record ABC-135 ok
+check "the gate command applies the requirement too" 1 "not in review format 2" bash -c "cd '$r' && node .githooks/master-lock-check.mjs gate ABC-135"
+g reset -q --hard
+new_repo r16b
+attempt "with no such line in CLAUDE.md no format is required" ok "" commit_with ABC-900 ok "feat(ABC-900): x"
+new_repo r16c
+printf -- '- **Review format 2 required from:**\n' >> "$r/CLAUDE.md"; g add -A
+attempt "a format 2 line with no number fails closed" refused "Review format 2 required from" commit_with ABC-901 v2:ok "feat(ABC-901): x"
+g reset -q --hard
+
+echo "== R17: a check-in cannot raise or remove the format 2 requirement"
+new_repo r17s ABC master 010 "" 130
+cs_variant=v2:ok
+attempt "raising the number" refused "review format 2 requirement (raised)" change_settings 's/ABC-130/ABC-500/' ABC-140 "feat(ABC-140): x"
+attempt "removing the line" refused "review format 2 requirement (removed)" change_settings '/Review format 2 required from/d' ABC-141 "feat(ABC-141): x"
+attempt "lowering the number" ok "" change_settings 's/ABC-130/ABC-120/' ABC-142 "feat(ABC-142): x"
+cs_variant=ok
+new_repo r17t
+attempt "adding the line to a CLAUDE.md that lacks it" ok "" change_settings '$a - **Review format 2 required from:** `ABC-200`' ABC-150 "feat(ABC-150): x"
+unset cs_variant
 
 echo "== the change that introduces the lock is merged without being refused"
 r="$tmp/boot"; def=master; pfx=ABC

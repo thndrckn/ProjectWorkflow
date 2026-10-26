@@ -16,7 +16,7 @@ Follow these steps in order. Stop where a step says STOP.
 ## Continue mode
 Run `git branch --show-current` on its own as a separate command first. The change number is the one in the branch name (`<type>/<NUMBER>-<title>`); if the current branch is not the default branch and its name has no change number, STOP and ask the user. If the current branch is not the default branch and `git log --grep "^docs(<NUMBER>): approved plan"` finds that commit, you are **continuing an existing change**, for example after `/commit-change` stopped on a failed review gate or after a stop case was answered. Say so in one line, then:
 - Skip steps 2 and 3. Do not create or switch branches, and do not touch the plan file. Run `git status` on its own; if there are uncommitted changes, show them and STOP.
-- Read the plan and the existing review record (`docs/reviews/<same file name as the plan>.md`) so you know what is open: failed gate items, unsettled findings, or whatever the user asked you to fix. If the branch has no review record yet, there is nothing to append to: carry on as for a new change from step 4 and write the record in step 9. If the record is in the old format (no `Review format` line and no "Caused by this change" lines), keep that format: append in the same style, do not add the marker, and the gate stays exempt.
+- Read the plan and the existing review record (`docs/reviews/<same file name as the plan>.md`) so you know what is open: failed gate items, unsettled findings, or whatever the user asked you to fix. If the branch has no review record yet, there is nothing to append to: carry on as for a new change from step 4 and write the record in step 9. If the record is in the old format (no `Review format` line and no "Caused by this change" lines), keep that format: append in the same style, do not add the marker, and the gate stays exempt. A record marked `Review format: accountability` (without the 2) keeps its keyword-read rounds the same way. A record marked `accountability 2` gets the fixed lines of step 9 added to it, appended and never rewritten; the lock refuses an old-format record for any change numbered at or above CLAUDE.md's "Review format 2 required from" line, so if this change is at or above it and its record is old-format, STOP and ask the user.
 - A gate failure about a record's own content (a missing label, severity or disposition, or a "caused: yes" finding marked logged) is fixed by **adding a correction line** under that finding, never by deleting or rewriting it: `**Correction (round N):** <what is now true>`. A missing label or severity is supplied by a fresh reviewer, never by you. The gate reads each finding as corrected by its latest correction line.
 - Do step 4 for those fixes only, then step 5.
 - Run the re-review loop in step 7 on the open items and the new fixes (the re-reviewer gets the diff of the new commits). Run the step 6 review as well whenever the new work includes anything beyond the smallest edit that fixes an open item (new code, new text, or a changed rule); when in doubt, run it. Give those reviewers the whole branch diff as usual.
@@ -106,6 +106,7 @@ You never have the last word on your own findings: every outcome, including ever
   - check every logged item and confirm the "caused: no" label is true,
   - check every fix (including fixed Fails) and say whether it really resolves the finding without breaking anything,
   - label every new finding it raises "caused: yes/no" and give it a severity, like step 6.
+  - Its brief says it must answer in a fixed form, because the author copies the answers into the review record as fixed lines the lock reads exactly (step 9): for every outcome you gave it (each finding, whatever its disposition, and each fixed requirement Fail) one word, `accepted` or `rejected`, with a reason for a rejection; the new findings it raised, each with severity and caused label; and whether the round is clean (every outcome accepted and no new finding at all). Do not give it the record's line formats; it never writes the record.
   - Settle its findings and any rejections the same way as above, with the same stop cases, and run the checks again if you fixed anything.
   - **A rejection** (of an explanation, of a "caused: no" label on a logged item, or of a fix): fix the problem properly. If it was a rejected "no" label, the finding is "caused: yes" from then on and can only be fixed or explained. A rejected explanation of a finding this change didn't cause may instead be logged, if the re-reviewer confirms the "no" label. If you still disagree after that, **stop case 3**: STOP and ask the user, quoting the reviewer's rejection and your reason.
   - **Another round:** a round is clean only when every outcome in it is accepted by the re-reviewer and it raised **no new finding at all**. A new finding, even one you then fix at once, makes the round not clean, so that fix is checked by the next round. If a round isn't clean, run the next round with a new fresh reviewer, which checks everything from that round's fixes, explanations and logged items. Keep going until a round is clean.
@@ -128,7 +129,7 @@ If the plan itself is a documentation change (for example rewriting, moving, arc
 # Review: <NUMBER> — <plan title>
 
 - **Change:** <NUMBER>
-- **Review format:** accountability
+- **Review format:** accountability 2
 - **Plan:** docs/plans/<plan file name> (approved in commit <short hash of the plan commit>)
 - **Branch:** <branch name>
 - **Reviewer:** <the independent reviewers (Standards, Spec, Correctness) and whether a re-review ran>
@@ -140,11 +141,14 @@ Every finding is listed, with the severity and caused label the reviewer assigne
 - **[Severity]** <one-line description> — <files>
   **Caused by this change:** yes | no
   **Disposition:** fixed (how) | explained (why) | logged in docs/BACKLOG.md
+  <If a finding was raised by a re-review round, add the line `**Raised in round:** N` (the round number).>
   <If a stop case applied, add the question asked and the user's answer.>
   <If the author disagreed with the severity or the label, add a line saying so and why. The severity and label above stay as given.>
+  **Re-review (round N):** accepted | rejected
+  <One such line for each round that checked this finding; a finding with no re-review line fails the gate. The latest round's line counts, so a rejection followed by a later accepted is fine. Add a line per round, never rewrite one. A finding carrying "Settled by the user:" needs none.>
 
 ## Re-review
-<Only if any ran. One subsection per round, in order: "### Round 1", "### Round 2", "### Round 3", and "### Round 4 (extra)", "### Round 5 (extra)" and so on for any round the user authorised beyond the third. Each says what triggered it, what the re-reviewer checked, whether it accepted each explanation, confirmed each logged item's "caused: no" label and accepted each fix, its new findings (with severity and caused label) and how they were settled, and whether the round was clean. Later runs append rounds and never rewrite earlier ones. Leave this section out if no re-review ran.>
+<Only if any ran. One subsection per round, in order: "### Round 1", "### Round 2", "### Round 3", and "### Round 4 (extra)", "### Round 5 (extra)" and so on for any round the user authorised beyond the third. Each says what triggered it, what the re-reviewer checked, whether it accepted each explanation, confirmed each logged item's "caused: no" label and accepted each fix, its new findings (with severity and caused label) and how they were settled. For a requirement fixed after a Fail, the round that checked it carries the line `**Re-review (round N):** R<id> accepted` (or `rejected`), with the requirement's id as in the trace table. Every round ends with exactly one line, `**Round N clean:** yes` or `**Round N clean:** no`, where N is the round's number; yes only when every outcome in it was accepted and it raised no new finding (a round marked yes that holds a rejection, or in which a finding was raised, fails the gate). Later runs append rounds and never rewrite earlier ones. Leave this section out if no re-review ran.>
 
 ## Requirements trace
 | Requirement | Test | Result |

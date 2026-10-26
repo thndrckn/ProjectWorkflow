@@ -9,10 +9,16 @@
 // Nothing project-specific lives here: the default branch, change prefix, version files
 // and the first checked change number come from CLAUDE.md (see readConfig). The written
 // rules this implements are the "Review gate" in /commit-change and the policy's peer
-// review section; they stay the specification. The records are free prose, so the gate reads
-// their labelled lines exactly but the re-review rounds only by keyword (a rejection, "clean",
-// a verdict word such as accepted/resolved); it cannot check item by item that each outcome was
-// accepted. /commit-change reads the record itself as well and stops if the two disagree.
+// review section; they stay the specification. The gate reads a record's labelled lines exactly.
+// A record in review format 2 (the header line "Review format: accountability 2", or any record
+// that carries the fixed re-review lines) also has its re-review verdicts read exactly: a
+// "**Re-review (round N):** accepted|rejected" line under each finding, the same line naming a
+// requirement for a fixed Fail, and a "**Round N clean:** yes|no" line closing each round. Only a
+// record in the old format (the marker without the 2, or none) still has its rounds read by
+// keyword (a rejection, "clean", a verdict word such as accepted/resolved), so for those it cannot
+// check item by item that each outcome was accepted. CLAUDE.md's "Review format 2 required from"
+// line makes format 2 mandatory from a change number on. /commit-change reads the record itself as
+// well and stops if the two disagree.
 //
 // Every unexpected problem refuses (exit 2): the lock fails closed.
 
@@ -71,7 +77,18 @@ function readConfig(claudeMd) {
     if (!m) problems.push(`"Master lock starts at" (${startRaw}) is not a change number with the prefix ${prefix}`);
     else start = parseInt(m[1], 10);
   }
-  return { ok: problems.length === 0, problems, defaultBranch, prefix, versionFiles, start, startRaw };
+  // Optional: a project without the line requires no particular record format. A line that is
+  // present but unreadable is a problem, never a silent "no requirement" (that would loosen the lock).
+  let format2From = null;
+  let format2Raw = null;
+  const f2Line = lineValue(claudeMd, 'Review format 2 required from');
+  if (f2Line !== null) {
+    format2Raw = firstWord(f2Line);
+    const m = prefix && format2Raw ? format2Raw.match(new RegExp(`^${esc(prefix)}-(\\d{3,})$`)) : null;
+    if (!m) problems.push(`"Review format 2 required from" (${format2Raw ?? 'empty'}) is not a change number with the prefix ${prefix}`);
+    else format2From = parseInt(m[1], 10);
+  }
+  return { ok: problems.length === 0, problems, defaultBranch, prefix, versionFiles, start, startRaw, format2From, format2Raw };
 }
 
 // ---------------------------------------------------------------- the review gate
@@ -185,10 +202,102 @@ function traceRows(body) {
   return rows;
 }
 
-// Returns { exempt, failures }. Old-format records are exempt.
-function evaluateRecord(raw) {
+// Review format 2: the fixed lines. The marker alone makes a record format 2; so does any fixed line,
+// so dropping the marker does not get a record back onto keyword reading.
+const FORMAT2_MARKER = /^- \*\*Review format:\*\* accountability 2\b/m;
+const FINDING_VERDICT = /\*\*Re-review \(round (\d+)\):\*\*\s*(accepted|rejected)\b/g;
+const FAIL_VERDICT = /\*\*Re-review \(round (\d+)\):\*\*\s*(R\S*?)\s+(accepted|rejected)\b/g;
+const ROUND_CLEAN = /\*\*Round (\d+) clean:\*\*\s*(yes|no)\b/g;
+const RAISED_IN = /\*\*Raised in round:\*\*\s*(\d+)/;
+function hasFormat2Lines(text) {
+  return /\*\*Re-review \(round \d+\):\*\*/.test(text) || /\*\*Round \d+ clean:\*\*/.test(text);
+}
+function blockTitle(block) {
+  return block.split('\n')[0].replace(/^- /, '').slice(0, 90);
+}
+// The verdict of the highest round wins; within one round the later line wins.
+function latestVerdict(verdicts) {
+  let best = null;
+  for (const v of verdicts) if (best === null || v.round >= best.round) best = v;
+  return best;
+}
+
+// The re-review rounds of a format 2 record, read exactly. `roundOf` maps round number to its text.
+function judgeFormat2Rounds({ blocks, rounds, trace, fixedFail }) {
+  const failures = [];
+  const known = new Set(rounds.map((r) => r.n));
+  const raisedIn = new Map(); // block -> round that raised it
+  for (const b of blocks) {
+    const m = b.match(RAISED_IN);
+    if (m) raisedIn.set(b, parseInt(m[1], 10));
+  }
+
+  for (const b of blocks) {
+    if (/Settled by the user:/.test(b)) continue;
+    const title = blockTitle(b);
+    const verdicts = [...b.matchAll(FINDING_VERDICT)].map((m) => ({ round: parseInt(m[1], 10), verdict: m[2] }));
+    const latest = latestVerdict(verdicts);
+    if (latest === null) { failures.push(`A finding has no "Re-review (round N): accepted" line: "${title}".`); continue; }
+    if (!known.has(latest.round)) failures.push(`A finding's re-review line names round ${latest.round}, which is not recorded: "${title}".`);
+    if (raisedIn.has(b) && latest.round <= raisedIn.get(b)) {
+      failures.push(`A finding raised in round ${raisedIn.get(b)} has a verdict from round ${latest.round}, which cannot have checked it: "${title}".`);
+    }
+    if (latest.verdict === 'rejected') failures.push(`A finding's latest re-review verdict is a rejection: "${title}".`);
+  }
+
+  // A fixed failed requirement needs its own verdict line, naming the requirement.
+  const failVerdicts = rounds.flatMap((r) => [...r.text.matchAll(FAIL_VERDICT)].map((m) => ({ round: parseInt(m[1], 10), id: m[2].toLowerCase(), verdict: m[3] })));
+  if (fixedFail) {
+    for (const row of trace.filter((t) => /fixed after fail/i.test(t.result))) {
+      const latest = latestVerdict(failVerdicts.filter((v) => v.id === row.id.toLowerCase()));
+      if (latest === null) failures.push(`Requirement ${row.id} was fixed after a Fail but no "Re-review (round N): ${row.id} accepted" line records the check.`);
+      else if (latest.verdict === 'rejected') failures.push(`Requirement ${row.id} was fixed after a Fail and its latest re-review verdict is a rejection.`);
+    }
+  }
+  for (const v of failVerdicts) if (!known.has(v.round)) failures.push(`A re-review line for ${v.id} names round ${v.round}, which is not recorded.`);
+
+  rounds.forEach((r, idx) => {
+    const settled = /Settled by the user:/.test(r.text);
+    if (idx >= 3 && !settled) {
+      failures.push(`Round ${r.n} is beyond the third and does not carry "Settled by the user:" authorising it.`);
+    }
+    const lines = [...r.text.matchAll(ROUND_CLEAN)].filter((m) => parseInt(m[1], 10) === r.n).map((m) => m[2]);
+    if (lines.length === 0 && !settled) failures.push(`Round ${r.n} has no "Round ${r.n} clean: yes/no" line.`);
+    if (new Set(lines).size > 1) failures.push(`Round ${r.n} says both clean: yes and clean: no.`);
+    if (lines.includes('yes') && !lines.includes('no')) {
+      const rejects = [
+        ...blocks.flatMap((b) => [...b.matchAll(FINDING_VERDICT)].filter((m) => parseInt(m[1], 10) === r.n && m[2] === 'rejected')),
+        ...failVerdicts.filter((v) => v.round === r.n && v.verdict === 'rejected'),
+      ];
+      if (rejects.length > 0) failures.push(`Round ${r.n} is marked clean but records a rejection.`);
+      const raised = blocks.filter((b) => raisedIn.get(b) === r.n);
+      if (raised.length > 0) failures.push(`Round ${r.n} is marked clean but raised a new finding: "${blockTitle(raised[0])}".`);
+    }
+  });
+
+  if (rounds.length > 0) {
+    const last = rounds[rounds.length - 1];
+    const lastLines = [...last.text.matchAll(ROUND_CLEAN)].filter((m) => parseInt(m[1], 10) === last.n).map((m) => m[2]);
+    if (!(lastLines.includes('yes') && !lastLines.includes('no')) && !/Settled by the user:/.test(last.text)) {
+      failures.push(`The re-review loop did not finish: the last round (round ${last.n}) is not clean and is not settled by the user.`);
+    }
+  }
+  return failures;
+}
+
+// Returns { exempt, failures }. Old-format records are exempt, unless `formatRequired` ({ startRaw })
+// says this change must already be in review format 2.
+function evaluateRecord(raw, formatRequired = null) {
   const text = raw.replace(/\r\n/g, '\n');
-  const newFormat = /^- \*\*Review format:\*\* accountability/m.test(text) || /^\s*\*\*Caused by this change:\*\*/m.test(text);
+  const marked2 = FORMAT2_MARKER.test(text);
+  const format2 = marked2 || hasFormat2Lines(text);
+  if (formatRequired && !marked2) {
+    return {
+      exempt: false,
+      failures: [`The record is not in review format 2, which changes from ${formatRequired.startRaw} on need: its header must carry "- **Review format:** accountability 2" and the fixed re-review lines.`],
+    };
+  }
+  const newFormat = format2 || /^- \*\*Review format:\*\* accountability/m.test(text) || /^\s*\*\*Caused by this change:\*\*/m.test(text);
   if (!newFormat) return { exempt: true, failures: [] };
   const sections = splitSections(text);
   const failures = [];
@@ -205,6 +314,10 @@ function evaluateRecord(raw) {
   const rounds = reBody === null ? [] : splitRounds(reBody);
   if ((blocks.length > 0 || fixedFail) && rounds.length === 0) {
     failures.push('There are findings (or a fixed failed requirement) but no re-review round is recorded.');
+  }
+  if (format2) {
+    failures.push(...judgeFormat2Rounds({ blocks, rounds, trace, fixedFail }));
+    return { exempt: false, failures };
   }
   if (rounds.length > 0) {
     const last = rounds[rounds.length - 1];
@@ -256,11 +369,15 @@ function findRecord(number, rev) {
   return { file, text };
 }
 
-function gateFor(number, rev) {
+// `cfg` is the lock's settings (readConfig); a change numbered at or above its "Review format 2
+// required from" number must have a record in review format 2.
+function gateFor(number, rev, cfg = null) {
   const rec = findRecord(number, rev);
   if (rec.missing) return { exempt: false, failures: [`${number} has no review record in ${RECORDS_DIR}/.`] };
   if (rec.ambiguous) return { exempt: false, failures: [`${number} has more than one review record (${rec.ambiguous.join(', ')}) and none matches its plan.`] };
-  return evaluateRecord(rec.text);
+  const n = number.match(/-(\d+)$/);
+  const required = cfg && cfg.format2From !== null && n && parseInt(n[1], 10) >= cfg.format2From;
+  return evaluateRecord(rec.text, required ? { startRaw: cfg.format2Raw } : null);
 }
 
 // ---------------------------------------------------------------- hook mode
@@ -306,7 +423,7 @@ function checkRange(oldTip, newTip, cfg) {
   for (const n of [...numbers].sort((a, b) => a - b)) {
     if (n < cfg.start) continue;
     const id = `${cfg.prefix}-${String(n).padStart(3, '0')}`;
-    const result = gateFor(id, newTip);
+    const result = gateFor(id, newTip, cfg);
     for (const f of result.failures) problems.push(`${id}: ${f}`);
   }
   return problems;
@@ -341,6 +458,11 @@ function loosenedSettings(before, after) {
   if (after.defaultBranch !== before.defaultBranch) changed.push('the default branch');
   if (after.prefix !== before.prefix) changed.push('the change prefix');
   if (after.start > before.start) changed.push('the starting number (raised)');
+  // Adding the format 2 line (before has none) or lowering its number only tightens the lock.
+  if (before.format2From !== null) {
+    if (after.format2From === null) changed.push('the review format 2 requirement (removed)');
+    else if (after.format2From > before.format2From) changed.push('the review format 2 requirement (raised)');
+  }
   const added = after.versionFiles.filter((f) => !before.versionFiles.includes(f));
   if (added.length > 0) changed.push(`the version files (added ${added.join(', ')})`);
   return changed;
@@ -412,7 +534,14 @@ function gateMode(args) {
   if (!number) throw new Error('usage: gate <change number> [--rev <revision>]');
   const ri = args.indexOf('--rev');
   const rev = ri >= 0 ? args[ri + 1] : null;
-  const result = gateFor(number, rev);
+  // The settings come from the same revision (or the working tree) as the record.
+  const claudeMd = rev ? gitTry(['show', `${rev}:CLAUDE.md`]) : (fs.existsSync('CLAUDE.md') ? fs.readFileSync('CLAUDE.md', 'utf8') : null);
+  const cfg = readConfig(claudeMd);
+  if (!cfg.ok) {
+    process.stdout.write(`Review gate for ${number}: FAILED\n${cfg.problems.map((p) => `  - The lock's settings are incomplete: ${p}.`).join('\n')}\n`);
+    return 1;
+  }
+  const result = gateFor(number, rev, cfg);
   if (result.exempt) {
     process.stdout.write(`Review gate for ${number}: the record is in the old format, so the gate does not apply.\n`);
     return 0;
