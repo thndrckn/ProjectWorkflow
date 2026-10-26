@@ -41,9 +41,3 @@ Entry format:
 - **Severity:** Low
 - **Files:** `docs/workflow-v2.md`, `skills/code-change/SKILL.md`
 - **What's wrong:** The workflow allows one narrow re-review. If that re-review rejects a fix or raises something new, the fixes made after it are checked by nobody, and the record can only say the round was not clean and that Jason decided. Consider a narrow check of those fixes when they are to the lock or guard.
-
-## The gate still skips some unlabelled findings
-- **Found in:** PWF-028
-- **Severity:** Low
-- **Files:** `githooks/trunk-lock-check.mjs`
-- **What's wrong:** In a review record, a finding with no labels is refused only when written as `- [High] text`, `- *[High]* text` or `- **[High]** text`. A lower-case severity, a `*` or numbered bullet, an indented bullet, a heading-style finding or `***` emphasis is silently skipped, so the gate passes. It was already so before PWF-028. A stricter rule would treat any line in the Findings section other than "None" as a finding that must be well formed.

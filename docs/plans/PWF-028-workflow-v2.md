@@ -151,4 +151,4 @@ then PWF-001 to PWF-027 (exactly those) and their records are unchanged (`git di
 - [x] 6. Repo settings: CLAUDE.md, `.gitattributes`, shared policy and process backlog copied in, backlog entry
 - [x] 7. Setup script: `adopt.sh`; `release/` from a local tag; test on a throwaway copy
 - [x] 8. Review PWF-028 with the new review
-- [ ] 9. Close-out: verification record, changelog entry, check-in (by hand), push only when Jason says so
+- [x] 9. Close-out records, changelog, tag and release/ (done). Still to do, when Jason says: check-in merge (by hand) and push of trunk and the tag. (verification record, changelog entry, check-in (by hand), push only when Jason says so)

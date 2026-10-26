@@ -122,7 +122,7 @@
   **Outcome:** fixed (the finding detector now matches `- [High] text` and the starred forms, with a test)
   **Re-review:** rejected
   **Decided by:** Jason
-  The re-reviewer rejected the first fix because the plain form was still skipped. It was fixed again and Jason authorised one extra narrow check on the gate. That check confirmed the gate refuses `- [Sev] text`, `- *[Sev]* text` and `- **[Sev]** text` for all five severities, with or without a continuation line. It also found other unlabelled forms still skipped (lower-case severity, `*` or numbered bullets, indented bullets, heading-style findings, `***` emphasis); those predate this change and are in the backlog.
+  The re-reviewer rejected the first fix because the plain form was still skipped. It was fixed again and Jason authorised one extra narrow check on the gate. That check confirmed the gate refuses `- [Sev] text`, `- *[Sev]* text` and `- **[Sev]** text` for all five severities, with or without a continuation line. It also found other unlabelled forms still skipped (lower-case severity, `*` or numbered bullets, indented bullets, heading-style findings, `***` emphasis); those predate this change and were then fixed by the stricter rule in G1.
 
 - **[Low]** C4: moving trunk backwards is not caught by the lock — githooks/trunk-lock-check.mjs
   **Caused by this change:** no
@@ -172,12 +172,19 @@
   **Outcome:** accepted by Jason (fixed after the re-review; Jason accepted the fix without another check)
   **Decided by:** Jason
 
+- **[Low]** G1: the gate still skipped unlabelled findings written in other forms (lower-case severity, `*` or numbered bullets, indented bullets, headings, `***` emphasis) — githooks/trunk-lock-check.mjs
+  **Caused by this change:** no
+  **Recommendation:** refuse every Findings line that is not "None" or a well-formed finding.
+  **Outcome:** fixed (the stricter rule, with a test for each of those forms; its backlog entry is closed as fixed by this change)
+  **Re-review:** accepted
+  Found by the extra narrow check on C3 and settled at Jason's direction. A second narrow check, on this gate change only, tried about 45 forms with LF and CRLF line endings: it refused every unlabelled or oddly written one, accepted every valid one, and found nothing that hides a finding. Its limits, none a defect: a trailing paragraph must be indented, an empty Findings section is accepted, and "None" followed by a note is refused.
+
 ## Re-review
 One fresh re-reviewer checked 25 outcomes: it accepted 24 and rejected the C3 fix, and raised N1 and N2. So the round was not clean.
 
 **Re-review clean:** no
 **Decided by:** Jason
-What Jason decided: N1 and N2 are accepted without another check. C3 was checked once more by a fresh reviewer, as an extra check on the gate that Jason authorised (not a full round); the result is in the C3 finding above.
+What Jason decided: N1 and N2 are accepted without another check. C3 was checked once more by a fresh reviewer, as an extra check on the gate that Jason authorised (not a full round); the result is in the C3 finding above. That check showed other unlabelled forms still slipped through, so Jason had the stricter rule put into PWF-028 (G1) and authorised a second narrow check of that gate change only, which was clean.
 
 ## Requirements trace
 | Requirement | Test | Result |
@@ -188,9 +195,9 @@ What Jason decided: N1 and N2 are accepted without another check. C3 was checked
 | R4 | Read the three planning skills against the design | Pass (checked by Claude) |
 | R5 | Read /code-change against the design | Pass (checked by Claude) |
 | R6 | Read /merge-change and /build-changes against the design | Pass (checked by Claude) |
-| R7 | Lock tests: a complete record passes and each failure case is refused (28 passed) | Pass (checked by Claude) |
+| R7 | Lock tests: a complete record passes and each failure case is refused (37 passed) | Pass (checked by Claude) |
 | R8 | Lock tests: ticket numbers accepted, a ticket at the tip of trunk refused | Pass (checked by Claude) |
-| R9 | `bash githooks/test-trunk-lock.sh`: 28 passed, about 28 seconds (not the few seconds hoped for) | Pass (checked by Claude) |
+| R9 | `bash githooks/test-trunk-lock.sh`: 37 passed, about 28 seconds (not the few seconds hoped for) | Pass (checked by Claude) |
 | R10 | Guard tests 9 passed; `shell-command-check` appears nowhere outside history | Pass (checked by Claude) |
 | R11 | CLAUDE.md is 27 lines; `.gitattributes` forces LF for `.sh` files | Pass (checked by Claude) |
 | R12 | Copies are byte-identical to the originals; the originals' hashes are unchanged | Pass (checked by Claude) |
@@ -199,7 +206,7 @@ What Jason decided: N1 and N2 are accepted without another check. C3 was checked
 | R15 | `release/` is a worktree at the local tag v0.1.0; `git check-ignore release` matches; no remote branch added | Pass (checked by Claude) |
 | R16 | `test-adopt.sh` on a throwaway copy with a stand-in for the claude command: the lock is on and both plugins are installed from the marketplace | Pass (checked by Claude) |
 | R17 | This record, from Matt's code-review plus our Correctness reviewer | Pass (checked by Claude) |
-| R18 | Old records unchanged, hooksPath untouched and nothing pushed are checked; the verification record, changelog entry and check-in message are made in step 9 | Manual |
+| R18 | Old records PWF-001 to PWF-027 unchanged (`git diff` empty); core.hooksPath never set by Claude; nothing pushed (no remote branch or tag added); verification record in docs/PWF-028-verification.md, written before check-in; changelog entry present; check-in message to be read at check-in (see the verification record) | Pass (checked by Claude) |
 
 ## Deviations from the plan
 - The spec's list: the plan keeps the spec frozen after approval, so findings carried from one ticket to a later one go in the large change's own review record, not in the spec. The skills and the lock follow this.
@@ -210,4 +217,4 @@ What Jason decided: N1 and N2 are accepted without another check. C3 was checked
 - The tag v0.1.0 and `release/` are re-cut at close-out.
 
 ## Summary
-27 findings: none High, one Medium (the hook-path decision, now recorded). Most were fixed or explained, two moved to the backlog, and the one rejected fix (C3) was fixed again and checked once more. The lock, guard and setup tests all pass; R18 closes in step 9.
+28 findings: none High, one Medium (the hook-path decision, now recorded). Most were fixed or explained, two moved to the backlog, and the one rejected fix (C3) was fixed again and checked once more. The lock, guard and setup tests all pass; R18 closes in step 9.
