@@ -17,9 +17,16 @@ stop() { echo "STOPPED: $*" >&2; exit 1; }
 command -v git >/dev/null || stop "git is not installed."
 command -v node >/dev/null || stop "node is not installed (the trunk lock needs it)."
 command -v "$claude_bin" >/dev/null || stop "the claude command is not installed."
-[ -f "$release/.claude-plugin/marketplace.json" ] || stop "release/ is not set up here. From the ProjectWorkflow folder run: git worktree add release <a local tag, for example v0.1.0>"
 git -C "$proj" rev-parse --show-toplevel >/dev/null 2>&1 || stop "$proj is not a git repository."
 proj="$(git -C "$proj" rev-parse --show-toplevel)"
+# The workflow's own repo runs its lock from its own githooks folder (CLAUDE.md, "Trunk lock"): the lock's
+# status check only accepts that folder, and release/ is untracked, so a worktree could not find it. Pointing
+# git at release/ here would read as "lock off" there. Same git directory means the same repo, worktrees included.
+common_dir() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
+mine=$(common_dir "$here")
+[ -n "$mine" ] && [ "$mine" = "$(common_dir "$proj")" ] && stop "this is the workflow's own repo, which uses its own githooks folder. Run: bash githooks/install-trunk-lock.sh"
+# Checked after the refusal above, because a worktree of the workflow's own repo has no release/ folder.
+[ -f "$release/.claude-plugin/marketplace.json" ] || stop "release/ is not set up here. From the ProjectWorkflow folder run: git worktree add release <a local tag, for example v0.1.0>"
 [ -f "$proj/CLAUDE.md" ] || stop "the project has no CLAUDE.md. Copy the Workflow lines from ProjectWorkflow's CLAUDE.md into one first."
 for line in 'Default branch' 'Change prefix' 'Version files' 'Trunk lock starts at'; do
   grep -q "\*\*$line:\*\*" "$proj/CLAUDE.md" || stop "the project's CLAUDE.md has no \"$line\" line in its Workflow section."

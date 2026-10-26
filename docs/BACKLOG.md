@@ -53,9 +53,3 @@ Entry format:
 - **Severity:** Low
 - **Files:** `CLAUDE.md`
 - **What's wrong:** The Rules say never to push until Jason says so, but `/merge-change` pushes the default branch itself. The rule should say that Jason typing `/merge-change` is that go-ahead. Raised by Jason while checking PWF-029.
-
-## adopt.sh and the lock check disagree on what "lock on" means in this repo
-- **Found in:** PWF-029
-- **Severity:** Low
-- **Files:** `adopt.sh`, `githooks/trunk-lock-check.mjs`, `CLAUDE.md`
-- **What's wrong:** In a project, `adopt.sh` points git at `release/githooks`. In ProjectWorkflow itself the lock check (`status`, and so `/merge-change`) only accepts the repo's own `githooks` folder, so it reads OFF when `release/githooks` is set, and `/merge-change` stops. Decide which this repo should use and make `adopt.sh`, the check and CLAUDE.md agree. Planned as PWF-030. Raised by Jason while running `/merge-change` for PWF-029.

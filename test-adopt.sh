@@ -57,6 +57,19 @@ cp "$here/CLAUDE.md" "$own/"; cp "$here/docs/agents/issue-tracker.md" "$own/docs
 git -C "$own" add -A; git -C "$own" commit -q -m "chore(PWF-001): init"
 expect 0 "Done" "this repo's own CLAUDE.md and setup file are accepted" bash "$pw/adopt.sh" "$own"
 
+# The workflow's own repo (and its worktrees) uses its own githooks folder, so adopt.sh refuses it (PWF-030).
+# This stand-in is a git repository holding adopt.sh itself; a worktree of it must be refused the same way.
+self="$tmp/self"; git init -q -b trunk "$self"; mkdir -p "$self/release"
+cp "$here/adopt.sh" "$self/"; cp -r "$here/.claude-plugin" "$here/githooks" "$self/release/"
+cp "$here/CLAUDE.md" "$self/"; mkdir -p "$self/docs/agents"; : > "$self/docs/agents/issue-tracker.md"
+git -C "$self" add -A; git -C "$self" commit -q -m "chore(PWF-001): init"
+git -C "$self" worktree add -q "$tmp/self-wt" -b other
+installs=$(grep -c "plugin install" "$tmp/log")
+expect 1 "install-trunk-lock.sh" "refuses the workflow's own repo" bash "$self/adopt.sh" "$self"
+expect 1 "install-trunk-lock.sh" "refuses a worktree of the workflow's own repo" bash "$self/adopt.sh" "$tmp/self-wt"
+[ -z "$(git -C "$self" config core.hooksPath)" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: the refused run set core.hooksPath"; }
+[ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: the refused run installed a plugin"; }
+
 echo "mattpocock-skills@claude-plugins-official" >> "$state"
 expect 1 "plugin uninstall mattpocock-skills@claude-plugins-official" "stops while the official copy is installed" bash "$pw/adopt.sh" "$proj"
 
