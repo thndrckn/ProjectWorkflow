@@ -11,15 +11,17 @@ This repo is the workflow itself: a Claude Code plugin (skills, guard hooks, tru
   - `bash hooks/test-block-main-edits.sh`
   - `bash test-adopt.sh`
   - `claude plugin validate .` (the only expected problems are the directory-only README and LICENSE notes)
+  - In PowerShell `bash` is not on the path, so run the three `bash` commands through Git's own bash. Set it once with `$bash = "C:\Program Files\Git\bin\bash.exe"`, then run `& $bash githooks/test-trunk-lock.sh`, `& $bash hooks/test-block-main-edits.sh` and `& $bash test-adopt.sh`. `claude plugin validate .` is the same in PowerShell.
 - **Version files:** `.claude-plugin/plugin.json`
 - **Build command:** none. A version is a tag; projects load the plugin from `release/`.
 - **Data folder:** none.
 - **Worktree folder:** `.claude/worktrees/<change number>`
 - **Worktree setup:** none.
-- **Records:** plans in `docs/plans/`, review records in `docs/reviews/`, decisions in `docs/DECISIONS.md`, backlog in `docs/BACKLOG.md`. `CHANGELOG.md` is the master list of change numbers. `docs/POLICY.md` and `docs/PROCESS_BACKLOG.md` are the shared policy and process backlog, moved in from `D:/projects/shared-claude-conventions` by PWF-028; Jason edits them by hand.
+- **Records:** plans in `docs/plans/`, review records in `docs/reviews/`, decisions in `docs/DECISIONS.md`, backlog in `docs/BACKLOG.md`. `CHANGELOG.md` is the master list of change numbers. `docs/POLICY.md` and `docs/PROCESS_BACKLOG.md` are the shared policy and process backlog (moved in from `D:/projects/shared-claude-conventions` by PWF-028); they change through normal changes.
 - **Guard:** `hooks/` blocks Claude's edit tools on the default branch (plan files excepted) and blocks plan mode. Shell commands are not checked; the lock is the real protection.
-- **Trunk lock:** `githooks/reference-transaction` and `githooks/trunk-lock-check.mjs` refuse any update of the default branch that is not a proper check-in: every new commit carries a change number, and every change from the starting number on has a review record that passes the gate. A check-in cannot loosen the lock's own settings in this file. Switching it on or off is Jason's step, in his own terminal; Claude never sets or unsets `core.hooksPath`. On: `bash githooks/install-trunk-lock.sh`. Off: `git config --unset core.hooksPath`. `node githooks/trunk-lock-check.mjs status` says which.
+- **Trunk lock:** `githooks/reference-transaction` and `githooks/trunk-lock-check.mjs` refuse any update of the default branch that is not a proper check-in: every new commit carries a change number, and every change from the starting number on has a review record that passes the gate. A check-in cannot loosen the lock's own settings in this file. Switching it on or off is Jason's step, in his own terminal; Claude never sets or unsets `core.hooksPath`. On: `bash githooks/install-trunk-lock.sh`. Off: `git config --unset core.hooksPath`. `node githooks/trunk-lock-check.mjs status` says which. In PowerShell, with `$bash` set as under Checks, on is `& $bash githooks/install-trunk-lock.sh`; off and `status` are typed exactly as above.
 - **Trunk lock starts at:** `PWF-029` (PWF-028 was built by hand before the lock was on in this repo; its review record is still checked with `node githooks/trunk-lock-check.mjs gate PWF-028`).
+- **Adopt the workflow in another project:** Jason runs `bash adopt.sh <project folder>` in his own terminal. In PowerShell, with `$bash` set as under Checks, it is `& $bash adopt.sh <project folder>`, with the folder written with forward slashes (for example `D:/Projects/MyApp`).
 
 ## Rules
 - Never commit to trunk, never force-push, and never push until Jason says so.
