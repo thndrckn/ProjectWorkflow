@@ -37,7 +37,7 @@ Several changes can be coded at once, each in its own worktree, so other branche
 - Run `git branch` and `git worktree list`, each on its own as a separate command, before anything else in this step. Never combine them with creating or switching a branch.
 - If the current branch is not the default branch, say so and STOP: a new change is started from the default branch.
 - If other working branches or worktrees exist, list them in one line each in plain English. They stay as they are; the new change starts from the default branch, so it won't include their work, and theirs won't include this one until they catch up at check-in.
-- For each of them, read its plan (`docs/plans/`, on the branch or waiting on the default branch) and compare the files its "Technical detail" names with the files this plan names. If any file appears in both, name the files and the other change, say that the second check-in to land will meet conflicts there, and ask whether to continue. STOP until they answer. If there is no overlap, say nothing more and go on.
+- For each of them, read its plan (`docs/plans/`, on the branch or waiting on the default branch) and compare the files its "Technical detail" names with the files this plan names. If any file appears in both, report it in one plain line that names the files and the other change and says the second check-in to land will meet conflicts there, and go on without asking. If there is no overlap, say nothing more and go on.
 
 ## 3. Make the working copy
 If CLAUDE.md has no "Worktree folder" line, say so, and use the single-folder flow at the end of this step instead.
