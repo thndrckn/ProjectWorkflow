@@ -12,11 +12,11 @@ Entry format:
 - **What's wrong:** <plain English>
 ```
 
-## Master guard: an absolute path into another worktree is allowed, the same path written relatively is blocked
+## Default-branch guard: an absolute path into another worktree is allowed, the same path written relatively is blocked
 - **Found in:** PWF-017
 - **Severity:** Informational
 - **Files:** `.claude/hooks/shell-command-check.js`, `.claude/hooks/block-main-edits.sh`
-- **What's wrong:** While the main folder is on master, a shell command that writes to another worktree's folder (for example `cp` or `Copy-Item` of a plan file into a change's worktree) is allowed when the destination is written as an absolute path, because that worktree is judged by its own branch, and is blocked when the same destination is written relatively, because a relative path cannot be resolved and counts as inside the project. The reviewer who rated it found this intended, best-effort behaviour that fails closed, not a defect, and not caused by PWF-017; it is logged at the user's direction because the cost is only that cross-worktree writes need absolute paths.
+- **What's wrong:** While the main folder is on the default branch, a shell command that writes to another worktree's folder (for example `cp` or `Copy-Item` of a plan file into a change's worktree) is allowed when the destination is written as an absolute path, because that worktree is judged by its own branch, and is blocked when the same destination is written relatively, because a relative path cannot be resolved and counts as inside the project. The reviewer who rated it found this intended, best-effort behaviour that fails closed, not a defect, and not caused by PWF-017; it is logged at the user's direction because the cost is only that cross-worktree writes need absolute paths.
 
 ## dev.mjs tells a worktree user to run npm install when node_modules is missing
 - **Found in:** PWF-023

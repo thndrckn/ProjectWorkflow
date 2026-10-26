@@ -199,7 +199,7 @@ for c in 'git worktree remove --force x' 'git worktree remove -f x' 'git worktre
   blocked "$c"
 done
 
-echo "== R10: the master lock's switch (core.hooksPath) is the user's alone, on master and from a worktree"
+echo "== R10: the trunk lock's switch (core.hooksPath) is the user's alone, on master and from a worktree"
 for c in 'git config core.hooksPath ""' 'git config core.hooksPath /nonexistent' 'git config --unset core.hooksPath' \
   'git config --unset-all core.hooksPath' 'git config --local core.hooksPath x' 'git config set core.hooksPath x' \
   'git config unset core.hooksPath' 'git config CORE.HOOKSPATH x' 'git config --global core.hooksPath x' \
@@ -290,6 +290,39 @@ printf 'No such line here.\n' > "$nolinefeature/CLAUDE.md"
 check "R12 no line, change branch: Edit in the shared folder allowed as before" 0 "$nolinefeature" Edit "$shared/POLICY.md"
 msgcheck "R12 no line: generic message" "Create a feature branch" "$noline" Edit "$shared/POLICY.md"
 msgcheck "R12 no line: no shared-folder message" "BLOCKED: You are on" "$noline" Edit "$shared/POLICY.md"
+
+echo "== R13: a project whose default branch is trunk (master and main stay guarded too)"
+trunk="$tmp/trunk-repo"; git init -q -b trunk "$trunk" >/dev/null
+git -C "$trunk" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+printf '.claude/*\n' > "$trunk/.gitignore"
+git -C "$trunk" add .gitignore
+git -C "$trunk" -c user.name=t -c user.email=t@t commit -q -m ignore
+mainrepo="$tmp/main-repo"; git init -q -b main "$mainrepo" >/dev/null
+git -C "$mainrepo" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
+for t in Edit Write MultiEdit NotebookEdit; do
+  check "trunk blocks $t on a project file" 2 "$trunk" "$t" "$trunk/src/x.ts"
+  check "trunk allows $t on a plan file" 0 "$trunk" "$t" "$trunk/docs/plans/ABC-001-x.md"
+  check "trunk blocks $t climbing out of plans" 2 "$trunk" "$t" "$trunk/docs/plans/../src/x.ts"
+  check "main still blocks $t on a project file" 2 "$mainrepo" "$t" "$mainrepo/src/x.ts"
+done
+for c in "echo hi > $trunk/src/x.txt" 'echo hi>f.txt' 'git commit -m x' 'git push --force' 'git branch -D trunk' 'git branch --delete --force trunk' 'sed -i s/a/b/ README.md'; do
+  both "trunk blocks: $c" 2 "$trunk" "$c"
+done
+for c in 'git status' 'git pull --ff-only' 'git merge --no-ff feat' 'git push' 'git push origin trunk' "echo hi > $trunk/docs/plans/ABC-001-x.md" 'git worktree list'; do
+  both "trunk allows: $c" 0 "$trunk" "$c"
+done
+twt="$trunk/.claude/worktrees/ABC-001"
+git -C "$trunk" worktree add -q "$twt" -b chore/ABC-001-w
+for t in Edit Write; do
+  checkc "trunk worktree allows $t on its own file" 0 "$trunk" "$twt" "$t" "$twt/src/x.ts"
+  checkc "trunk worktree session blocks $t on trunk's file" 2 "$trunk" "$twt" "$t" "$trunk/src/x.ts"
+done
+for c in "echo hi > $trunk/src/x.txt" "git -C $trunk commit -m x" 'git branch -f trunk HEAD' 'git branch -D trunk' 'git update-ref refs/heads/trunk HEAD' \
+  'git push origin HEAD:trunk' 'git push origin +HEAD:trunk' 'git fetch -u . HEAD:trunk' 'git --namespace foo update-ref -d refs/heads/trunk'; do
+  bothc "trunk worktree session blocks: $c" 2 "$trunk" "$twt" "$c"
+done
+bothc "trunk worktree allows its own file write" 0 "$trunk" "$twt" "echo hi > $twt/x.txt"
+bothc "trunk worktree session still reads trunk" 0 "$trunk" "$twt" "git -C $trunk status"
 
 echo
 echo "$pass passed, $fail failed"

@@ -31,7 +31,12 @@ Entry format:
 - **Date:** 2026-10-24
 - **Reason:** Every change adds an entry at the top of `## [Unreleased]` in `CHANGELOG.md`, so when two changes are coded at once in separate worktrees, the second one's catch-up merge in `/commit-change` conflicts there almost every time. When `CHANGELOG.md` is the only conflicting file and this change's own diff to it is just its own entry, the skill keeps the default branch's text, adds this change's entry at the top of Unreleased, tells the user in one line, and carries on. Any other conflict still aborts the merge and asks the user, and the skill still never rewrites a change's entry otherwise. (The earlier stop-and-ask rule was PWF-002, moved here from the former known-issues file in PWF-009.)
 
-## The master lock covers updates made through the main folder, not plumbing run from a stale worktree
+## The trunk lock covers updates made through the main folder, not plumbing run from a stale worktree
 - **Change:** PWF-017
 - **Date:** 2026-10-24
 - **Reason:** `core.hooksPath` is the relative folder `.githooks`, so each worktree runs its own branch's copy of the hook (none, in a worktree branched before the lock existed). The default branch can only be advanced by porcelain (commit, merge, pull) in the main folder, where the default branch's own copy runs. From any other worktree only plumbing can move it (`update-ref`, `branch -f`, a fetch refspec), which the Claude guard blocks for Claude; a user typing plumbing by hand is the same class as turning the lock off by hand, which CLAUDE.md documents as the user's own step. An absolute hook path was not chosen: it would make `status` and the lock's own bootstrap depend on the main folder holding the files.
+
+## The lock reads CLAUDE.md's lock lines under both the "Trunk lock" and the older "Master lock" label
+- **Change:** PWF-025
+- **Date:** 2026-10-26
+- **Reason:** A check-in cannot edit the lock's own settings, so CLAUDE.md's lock labels and "Default branch" value are changed by hand, with the lock off, after the renamed checker and skills are checked in. Reading either label (the new one first) means the lock and `/commit-change` work both before and after that hand edit, in either order, instead of failing closed in between. The guard hooks likewise keep `master` and `main` guarded next to `trunk`, so no name loses protection.

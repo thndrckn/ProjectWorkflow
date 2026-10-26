@@ -1,13 +1,14 @@
 #!/bin/bash
-# PreToolUse hook: blocks Claude from editing files while on master/main.
+# PreToolUse hook: blocks Claude from editing files while on the default branch (trunk,
+# or the older names master/main, which stay guarded as a safety net).
 # Covers the edit tools and, via shell-command-check.js, the Bash and PowerShell tools.
-# Always allowed, even on master:
+# Always allowed, even on the default branch:
 #   - plan files directly inside this project's docs/plans/ (written by /plan-change)
 #   - shell commands that pass the check: an allow-list of git subcommands, and no
 #     file writes into the project.
 # Worktrees: a worktree of this project is judged by its own branch, not the main
 # folder's. Work in a worktree on a change branch is not blocked, but while the main
-# folder is on master it stays protected from every chat, including one inside a worktree.
+# folder is on the default branch it stays protected from every chat, including one inside a worktree.
 # The shell check is best-effort pattern matching, not a sandbox: it does not look
 # inside scripts or interpreters (node -e, python -c, ...). See shell-command-check.js.
 
@@ -36,9 +37,9 @@ process.stdin.on("data", d => s += d).on("end", () => {
 
 abs_common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
 branch_in() { git -C "$1" rev-parse --abbrev-ref HEAD 2>/dev/null; }
-# Only a named branch other than master/main is let through. An unreadable branch or a
-# detached HEAD (rev-parse prints "HEAD") fails closed, same as being on master.
-guarded() { [ -z "$1" ] || [ "$1" = "HEAD" ] || [ "$1" = "master" ] || [ "$1" = "main" ]; }
+# Only a named branch other than trunk/master/main is let through. An unreadable branch or a
+# detached HEAD (rev-parse prints "HEAD") fails closed, same as being on the default branch.
+guarded() { [ -z "$1" ] || [ "$1" = "HEAD" ] || [ "$1" = "trunk" ] || [ "$1" = "master" ] || [ "$1" = "main" ]; }
 
 proj_common=$(abs_common "$proj")
 proj_common_n=$(norm "$proj_common")
@@ -63,7 +64,7 @@ tool=$(jget tool)
 # The shared conventions folder is edited by the user by hand only, whatever the branch.
 # Its path comes from the project's CLAUDE.md ("Shared conventions folder" line, first
 # `backticked` path on it). With no such line this rule is off, and an edit there is judged
-# like any other file outside the project (blocked while the project folder is on master).
+# like any other file outside the project (blocked while the project folder is on the default branch).
 shared=""
 if [ -f "$proj/CLAUDE.md" ]; then
   shared=$(grep -m1 '^- \*\*Shared conventions folder:\*\*' "$proj/CLAUDE.md" | tr -d '\r' | sed -n 's/^[^`]*`\([^`]*\)`.*/\1/p')
@@ -102,10 +103,10 @@ if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
   cwd=$(jget cwd)
   cwd=$(cygpath -u "$cwd" 2>/dev/null || printf '%s' "$cwd")
   branch=$(branch_for "$cwd")
-  mode=master
+  mode=main-folder
   if ! guarded "$branch"; then
     # On a change branch. In a worktree the main folder still has to be protected
-    # while it sits on master; anywhere else nothing is guarded.
+    # while it sits on the default branch; anywhere else nothing is guarded.
     guarded "$(branch_in "$main_root")" || exit 0
     mode=worktree
     branch=$(branch_in "$main_root")
@@ -160,9 +161,9 @@ if [ -n "$target" ]; then
 fi
 branch=$(branch_for "$dir")
 
-# An unreadable branch fails closed, same as being on master. (As before, a detached HEAD
+# An unreadable branch fails closed, same as being on the default branch. (As before, a detached HEAD
 # is not blocked for the edit tools; only the shell tools treat it as unreadable.)
-if [ -z "$branch" ] || [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
+if [ -z "$branch" ] || [ "$branch" = "trunk" ] || [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
   echo "BLOCKED: You are on '${branch:-an unknown branch}'. Create a feature branch from the default branch first (git switch -c <type>/<short-description>) before editing any files. Never edit on the default branch." >&2
   exit 2
 fi

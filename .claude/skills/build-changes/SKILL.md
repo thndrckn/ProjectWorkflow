@@ -20,7 +20,7 @@ Run each as its own command.
 - Fetch from GitHub and confirm the default branch matches `origin/<default>`.
 - Run `git branch` and `git worktree list`. A leftover `build/vX.Y.Z` branch means an earlier build was interrupted: say so, and STOP so the user can decide what to do with it. Any other working branch or worktree is a change still being coded: that does not stop the build, because only what is already merged is built. List each in one plain line as "not part of this version", and carry on. Leave them untouched.
 
-- If CLAUDE.md has a "Master lock" line, run the status command it names. If it says the lock is off, STOP and tell the user in plain English to switch it on as CLAUDE.md says (a step for them to take).
+- If CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line), run the status command it names. If it says the lock is off, STOP and tell the user in plain English to switch it on as CLAUDE.md says (a step for them to take).
 
 If any of these fails, STOP and tell the user in plain English what is wrong.
 
@@ -46,7 +46,7 @@ Run every check under "Checks (all must pass)" in CLAUDE.md, plus every check un
 - In `CHANGELOG.md`, move the Unreleased entries under a new heading `## [X.Y.Z] - <today's date>`, leaving an empty `## [Unreleased]` above it.
 - Set the version in the version files that hold it directly (everything under "Version files" in CLAUDE.md except the lockfiles).
 - Regenerate the lockfiles with the tools, never by hand, with the commands in CLAUDE.md's "Lockfile commands" line (if CLAUDE.md has no such line, say so and ask the user how). Then compare each lockfile against the default branch (`git diff <default> -- <lockfile>`). The only changes allowed are the project's own version lines. If anything else changed (for example a dependency version), STOP, leave the branch as it is, show the user the diff, and do not commit.
-- Commit everything on the branch with the message `chore(release): vX.Y.Z`. The master lock (if CLAUDE.md has a "Master lock" line) lets this release commit and its merge through only because the message has exactly this form and the commit changes nothing but the version files and `CHANGELOG.md`; if anything else is in it, the lock refuses the merge, so STOP and tell the user instead of working round it.
+- Commit everything on the branch with the message `chore(release): vX.Y.Z`. The trunk lock (if CLAUDE.md has a "Trunk lock" line (or the older "Master lock" line)) lets this release commit and its merge through only because the message has exactly this form and the commit changes nothing but the version files and `CHANGELOG.md`; if anything else is in it, the lock refuses the merge, so STOP and tell the user instead of working round it.
 - Switch to the default branch and merge with `git merge --no-ff build/vX.Y.Z`, using the message `chore(release): vX.Y.Z`. If the merge conflicts, run `git merge --abort`, STOP, and tell the user.
 - Push the default branch. If the push is rejected, STOP and tell the user in plain English. Do not force-push.
 - Only after the push succeeds, delete the branch with `git branch -d` (never `-D`).
@@ -68,5 +68,5 @@ Last of all, if step 1 found changes still being coded, list them again as not p
 - Edit anything in the data folder (CLAUDE.md's "Data folder" line) or run anything against it.
 - Force-push, or push any branch other than the default branch and the tag.
 - Make a version in any other way. A check-in never does.
-- Turn the master lock off, or set `core.hooksPath` in any way.
+- Turn the trunk lock off, or set `core.hooksPath` in any way.
 - Touch a working branch or worktree of a change still being coded. Such a change catches up with the release commit at its own check-in.
