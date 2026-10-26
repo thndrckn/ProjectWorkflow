@@ -82,8 +82,8 @@ The re-reviewer accepted every outcome above and raised the one Informational at
 | R1 | New `test-adopt.sh` cases run adopt.sh on a stand-in git repository holding adopt.sh itself: exit 1, the words `install-trunk-lock.sh`, no `core.hooksPath` set, no new `plugin install` in the log. Also run for real: `bash adopt.sh .` in this repo stops with "this is the workflow's own repo". 14 passed, 0 failed | Pass |
 | R2 | The same test adds a worktree of that stand-in repository and runs adopt.sh on it: same refusal | Pass |
 | R3 | The 10 existing `test-adopt.sh` cases still pass (14 passed in all with the 4 new checks) | Pass |
-| R4 | Manual: `node githooks/trunk-lock-check.mjs status` reads `Trunk lock: ON.` in the PWF-030 worktree and in the main folder (git's hook folder is `githooks`) | Manual |
-| R5 | Manual: the Trunk lock line in CLAUDE.md says this repo uses its own `githooks/`, `release/githooks` is for other projects, and `adopt.sh` refuses here; the On, Off and status commands are unchanged | Manual |
+| R4 | Manual: `node githooks/trunk-lock-check.mjs status` reads `Trunk lock: ON.` in the PWF-030 worktree and in the main folder (git's hook folder is `githooks`) | Pass (checked by Jason) |
+| R5 | Manual: the Trunk lock line in CLAUDE.md says this repo uses its own `githooks/`, `release/githooks` is for other projects, and `adopt.sh` refuses here; the On, Off and status commands are unchanged | Pass (checked by Jason) |
 | R6 | `bash githooks/test-trunk-lock.sh`: 37 passed, 0 failed; the diff changes no default branch, prefix, version file or starting-number line in CLAUDE.md; `node githooks/trunk-lock-check.mjs gate PWF-030` passed | Pass |
 
 ## Deviations from the plan
