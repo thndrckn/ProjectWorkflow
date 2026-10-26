@@ -6,6 +6,8 @@ One short entry per change number, newest first. Entries wait under Unreleased u
 
 ## [Unreleased]
 
+- PWF-026 (chore) /code-change now reports file overlap with other open changes in one line and carries on instead of asking; /commit-change, on any conflict other than CHANGELOG.md, still stops with the merge aborted, but now shows each conflicted file with the resolution it proposes and why, and applies nothing until you answer.
+
 - PWF-025 (chore) Prepared the workflow for renaming the default branch from master to trunk: the guard now protects trunk, master and main, the master lock is renamed the trunk lock (files, scripts, tests, skills, wording) and reads CLAUDE.md's lock lines under either label, and living docs say "the default branch". The rename itself (local, GitHub, and the CLAUDE.md branch name and lock labels) is a by-hand checklist in the plan, run after check-in.
 - PWF-024 (chore) /plan-change now offers a fourth backlog choice, "include it in this change" (the item joins the plan with its own requirement and test and is listed under "Backlog items fixed"; recommended only when it touches the same files or area as the change, otherwise keeping it queued is recommended), and shows `/rename <NUMBER>` right after announcing the change number, again if the number moves. The backlog file's introduction and the shared policy's sentence (edited by hand) list all four choices.
 
