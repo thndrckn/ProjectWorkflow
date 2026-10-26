@@ -231,6 +231,19 @@ It accepted every fix and raised no new finding.
 **Re-review (round 1):** R1 accepted
 **Round 1 clean:** yes
 " ;;
+    dupclean) rereview="## Re-review
+
+### Round 1
+**Round 1 clean:** yes
+**Round 1 clean:** yes
+" ;;
+    failfixedcolon) f1=""; trace="Pass (fixed after Fail)"
+      rereview="## Re-review
+
+### Round 1
+**Re-review (round 1):** R1: accepted
+**Round 1 clean:** yes
+" ;;
     failfixedrej) f1=""; trace="Pass (fixed after Fail)"
       rereview="## Re-review
 
@@ -484,6 +497,11 @@ attempt "a fourth round not authorised" refused "beyond the third" commit_with A
 attempt "a fixed failed requirement with its accepted line" ok "" commit_with ABC-115 v2:failfixed "feat(ABC-115): x"
 attempt "a fixed failed requirement whose latest verdict is a rejection" refused "latest re-review verdict is a rejection" commit_with ABC-116 v2:failfixedrej "feat(ABC-116): x"
 attempt "a fixed failed requirement with no line" refused 'no "Re-review (round N): R1 accepted" line' commit_with ABC-117 v2:failfixednoline "feat(ABC-117): x"
+attempt "a fixed failed requirement whose line spells the id with a colon" ok "" commit_with ABC-121 v2:failfixedcolon "feat(ABC-121): x"
+attempt "a round with two clean lines" refused 'it needs exactly one' commit_with ABC-122 v2:dupclean "feat(ABC-122): x"
+put_record ABC-123 v2:ok
+check "the gate command refuses a number with another prefix" 1 "not a change number with the prefix ABC" bash -c "cd '$r' && node .githooks/master-lock-check.mjs gate XYZ-123"
+g reset -q --hard
 attempt "fixed lines under the old marker are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-118 v2:oldmarker "feat(ABC-118): x"
 attempt "fixed lines with no marker at all are read by the new rules" refused 'has no "Re-review (round N): accepted" line' commit_with ABC-119 v2:nomarker "feat(ABC-119): x"
 attempt "an old-format record keeps its keyword reading" ok "" commit_with ABC-120 cleanmention "feat(ABC-120): x"
