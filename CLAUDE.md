@@ -9,6 +9,7 @@ This repo is the workflow itself: a Claude Code plugin (skills, guard hooks, tru
 - **Checks (all must pass):** run each as its own command.
   - `bash githooks/test-trunk-lock.sh`
   - `bash hooks/test-block-main-edits.sh`
+  - `bash test-adopt.sh`
   - `claude plugin validate .` (the only expected problems are the directory-only README and LICENSE notes)
 - **Version files:** `.claude-plugin/plugin.json`
 - **Build command:** none. A version is a tag; projects load the plugin from `release/`.
