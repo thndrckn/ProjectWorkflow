@@ -1,0 +1,3 @@
+# The trunk lock's hook scripts run under sh on every platform: keep their line endings as LF
+# even where git would otherwise convert to CRLF on checkout.
+.githooks/* text eol=lf
