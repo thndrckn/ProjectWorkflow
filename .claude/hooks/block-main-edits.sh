@@ -60,6 +60,37 @@ case "$proj_common" in */.git) main_root="${proj_common%/.git}" ;; esac
 
 tool=$(jget tool)
 
+# The shared conventions folder is edited by the user by hand only, whatever the branch.
+# Its path comes from the project's CLAUDE.md ("Shared conventions folder" line, first
+# `backticked` path on it). With no such line this rule is off, and an edit there is judged
+# like any other file outside the project (blocked while the project folder is on master).
+shared=""
+if [ -f "$proj/CLAUDE.md" ]; then
+  shared=$(grep -m1 '^- \*\*Shared conventions folder:\*\*' "$proj/CLAUDE.md" | tr -d '\r' | sed -n 's/^[^`]*`\([^`]*\)`.*/\1/p')
+fi
+shared_msg="BLOCKED: the shared conventions folder is edited by the user only. Claude never changes it. If a change needs it edited, put the exact old and new text in the plan's \"Policy edits for you to make by hand\" section."
+if [ -n "$shared" ]; then
+  sn=$(norm "$shared")
+  sn=${sn%/}
+  if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
+    # Shared-only pass of the checker: only writes into that folder are judged.
+    here=$(cygpath -m "$(dirname "$0")" 2>/dev/null || dirname "$0")
+    sv=$(printf '%s' "$input" | MSYS2_ARG_CONV_EXCL="*" node "$here/shell-command-check.js" "$sn" shared 2>/dev/null)
+    case "$sv" in
+      block:*) echo "$shared_msg (${sv#block: })" >&2; exit 2 ;;
+    esac
+  else
+    st=$(jget target)
+    if [ -n "$st" ]; then
+      st=$(cygpath -u "$st" 2>/dev/null || printf '%s' "$st")
+      st=$(norm "$(realpath -m "$st" 2>/dev/null || printf '%s' "$st")")
+      case "$st" in
+        "$sn"|"$sn"/*) echo "$shared_msg" >&2; exit 2 ;;
+      esac
+    fi
+  fi
+fi
+
 if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
   cwd=$(jget cwd)
   cwd=$(cygpath -u "$cwd" 2>/dev/null || printf '%s' "$cwd")

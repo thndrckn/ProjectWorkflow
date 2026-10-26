@@ -6,6 +6,10 @@
 //   argv[5+] the paths of the repository's other worktrees, which are not guarded
 // Prints "allow" or "block: <reason>".
 //
+// Shared-only pass: called with argv[2] = the shared conventions folder and argv[3] =
+// 'shared'. Only writes into that folder (and cd into it) are judged; everything else is
+// allowed, on any branch. The user edits that folder by hand, so Claude never does.
+//
 // This is best-effort pattern matching, not a sandbox. It does not look inside
 // scripts or interpreters (node -e, python -c, ...), find -exec/-delete, or
 // anything built from variables. A path it cannot resolve counts as inside the
@@ -21,6 +25,8 @@ const otherWorktrees = process.argv.slice(5).map(normPath);
 // folder (proj) is on master: the worktree's own files are free to change, and only the
 // main folder is protected. Anything else is 'master': proj is the folder being guarded.
 const worktreeMode = process.argv[3] === 'worktree';
+// Shared-only pass (see the header): proj is then the shared folder, not the project.
+const sharedOnly = process.argv[3] === 'shared';
 
 // Git subcommands allowed as a whole, apart from the flags in destructiveGitFlag()
 // (tag -d, switch -f, branch -D) and --output (which writes a file).
@@ -120,6 +126,15 @@ function ignoredInMain(rel) {
 // True when writing to this path is allowed on master.
 function destOk(raw) {
   const w = stripQuotes(raw);
+  if (sharedOnly) {
+    // A variable or a relative path can't be placed from the text: allowed here, as the
+    // normal pass handles those on a guarded branch.
+    if (w === '' || /[$%`]/.test(w) || w[0] === '~') return true;
+    const n = normPath(w);
+    if (!n.startsWith('/')) return true;
+    const abs = path.posix.normalize(n);
+    return abs !== proj && !abs.startsWith(proj + '/');
+  }
   if (w === '') return false;
   const low = w.toLowerCase();
   if (low === '/dev/null' || low === '$null' || low === 'nul') return true;
@@ -534,6 +549,35 @@ function segmentCheck(words, depth) {
   const { words: ws, targets } = splitRedirects(words);
   for (const t of targets) {
     if (!destOk(t)) return `redirect to ${stripQuotes(t)}`;
+  }
+  if (sharedOnly) {
+    // Only writers and cd matter; git (and the rest) is left to the normal pass.
+    const j = commandIndex(ws);
+    if (j >= ws.length) return null;
+    const nm = stripQuotes(ws[j]).replace(/\\/g, '/').split('/').pop().toLowerCase().replace(/\.exe$/, '');
+    const as = ws.slice(j + 1);
+    if (CD_COMMANDS.has(nm)) {
+      for (const d of destinations('first-path', as)) {
+        if (!destOk(d)) return `${nm} into the shared conventions folder`;
+      }
+      return null;
+    }
+    if (SHELLS.has(nm)) {
+      const fi = as.findIndex((a) => SHELL_CMD_FLAG.test(a.toLowerCase()));
+      if (fi >= 0 && as[fi + 1] && depth < 3) return analyze(unquote(as.slice(fi + 1).join(' ')), depth + 1);
+      return null;
+    }
+    if (nm === 'dd') {
+      const of = as.find((a) => a.startsWith('of='));
+      return of && !destOk(of.slice(3)) ? `dd writes to ${of.slice(3)}` : null;
+    }
+    const k = WRITERS[nm];
+    if (k) {
+      for (const d of destinations(k, as)) {
+        if (!destOk(d)) return `${nm} writes to ${stripQuotes(d)}`;
+      }
+    }
+    return null;
   }
   if (worktreeMode && gitEnvIntoMain(ws)) return 'git pointed at the main folder through the environment';
   if (ws.some((w) => GIT_CONFIG_ENV.test(stripQuotes(w)))) return 'git settings given through the environment could switch the master lock off';

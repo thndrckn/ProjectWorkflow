@@ -16,7 +16,7 @@ Do not enter plan mode. Write the plan file directly, then stop.
 Never skip the interview or the play-back. If the request already answers everything, say so and ask at least: "Is there anything you want to add or change?" Always do the play-back and wait for the user's yes before writing the plan.
 
 ## 1. Look before asking
-- Read CLAUDE.md and the shared POLICY.md if they aren't already loaded.
+- Read CLAUDE.md and the shared POLICY.md if they aren't already loaded. Never edit anything in the shared conventions folder (see CLAUDE.md); if the change needs it edited, the plan carries the exact wording (step 6).
 - Read the code the idea touches. Look things up yourself instead of asking the user questions the code can answer.
 - Run `git status`. If there are uncommitted edits (other than plan files, which other planning chats may have waiting), list them and ask the user whether they are part of this change. If they are, the plan must say so and describe them, so `/code-change` carries them onto the branch.
 - If the request is a bug report, find the actual root cause first using the diagnosing-bugs skill, then plan the fix.
@@ -112,6 +112,9 @@ Expected: <what the user should see.>
 - Branch: <type>/<NUMBER>-<short-title>
 - Commit message: <type>(<NUMBER>): <one line>
 
+## Policy edits for you to make by hand
+<Only when the change needs a file in the shared conventions folder edited (CLAUDE.md's "Shared conventions folder" line names it): for each edit, the file, the exact old text (it must appear exactly once in the file; check it) and the exact new text, each in a fenced block whose fence is longer than any run of backticks or tildes inside it. Claude never edits that folder, so nothing about the wording is left to /code-change. Leave this section out otherwise.>
+
 ---
 
 ## Technical detail (for Claude)
@@ -128,6 +131,7 @@ Rules for the plan:
 - Follow the architecture and conventions CLAUDE.md describes.
 - Tests never use a made-up change or a test-only decision; a check that needs a live run uses the next real change.
 - Workflow and tooling changes are type chore.
+- The shared conventions folder is edited by the user by hand only, never by Claude. When the change needs it edited, the plan gives the exact old and new text in its "Policy edits for you to make by hand" section. A plan with no such edit leaves the section out.
 - Shared skills and hooks never contain anything project-specific (numbers, file names, app features); project facts come from CLAUDE.md. The shared workflow's own paths (plans, reviews, changelog, backlog, decisions) are not project-specific.
 - If any section would be long, the change is probably too big. Say so and suggest splitting it into separate changes, each with its own number.
 

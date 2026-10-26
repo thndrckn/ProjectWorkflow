@@ -218,6 +218,57 @@ done
 # On master every two-word `git config` was already blocked (the older rule), so only the worktree case is new.
 bothc "worktree allows: git config get core.hooksPath" 0 "$master" "$wt" 'git config get core.hooksPath'
 
+echo "== R11: the shared conventions folder is the user's alone, on every branch"
+shared="$tmp/shared-conventions"; mkdir "$shared"; echo policy > "$shared/POLICY.md"
+winshared=$(cygpath -m "$shared" 2>/dev/null || echo "$shared")
+# Master and feature projects whose CLAUDE.md names the folder; one master project without the line.
+printf -- '- **Shared conventions folder:** `%s` (edited by the user only).\n' "$winshared" > "$master/CLAUDE.md"
+printf -- '- **Shared conventions folder:** `%s` (edited by the user only).\n' "$winshared" > "$feature/CLAUDE.md"
+noline="$tmp/master-no-line"; mk_repo "$noline"; printf 'No such line here.\n' > "$noline/CLAUDE.md"
+
+# msgcheck <name> <want text in stderr> <repo dir> <tool> <command-or-file_path>
+msgcheck() {
+  local name=$1 want=$2 repo=$3 tool=$4 arg=$5 json err
+  case "$tool" in
+    Bash|PowerShell) json=$(node -e 'console.log(JSON.stringify({tool_name:process.argv[1],tool_input:{command:process.argv[2]}}))' "$tool" "$arg") ;;
+    *) json=$(node -e 'console.log(JSON.stringify({tool_name:process.argv[1],tool_input:{file_path:process.argv[2]}}))' "$tool" "$arg") ;;
+  esac
+  err=$(printf '%s' "$json" | CLAUDE_PROJECT_DIR="$repo" bash "$hook" 2>&1 >/dev/null)
+  if [[ "$err" == *"$want"* ]]; then pass=$((pass+1)); echo "PASS  $name"
+  else fail=$((fail+1)); echo "FAIL  $name (message lacked '$want'): $err"; fi
+}
+
+for repo in "$master" "$feature"; do
+  for tool in Edit Write MultiEdit NotebookEdit; do
+    check "R11 $(basename "$repo") blocks $tool in the shared folder" 2 "$repo" "$tool" "$shared/POLICY.md"
+  done
+  check "R11 $(basename "$repo") blocks a new file in the shared folder" 2 "$repo" Write "$shared/NEW.md"
+  check "R11 $(basename "$repo") blocks a .. path into the shared folder" 2 "$repo" Edit "$shared/sub/../POLICY.md"
+  for c in "echo hi >> $shared/POLICY.md" "echo hi > $shared/POLICY.md" "cp a $shared/POLICY.md" \
+    "sed -i s/a/b/ $shared/POLICY.md" "Set-Content $shared/POLICY.md hi" "Add-Content -Path $shared/POLICY.md -Value hi" \
+    "rm $shared/POLICY.md" "touch $shared/X.md" "mv a $shared/POLICY.md" "bash -c \"echo hi > $shared/POLICY.md\"" \
+    "cd $shared" "echo hi | tee $shared/POLICY.md"; do
+    both "R11 $(basename "$repo") blocks: $c" 2 "$repo" "$c"
+  done
+  both "R11 $(basename "$repo") allows reading the shared folder" 0 "$repo" "cat $shared/POLICY.md"
+done
+# Not just the master: a feature branch still edits its own files.
+check "R11 feature project edit still allowed" 0 "$feature" Edit "$feature/src/x.ts"
+both "R11 feature project shell write still allowed" 0 "$feature" "echo hi > $feature/x.txt"
+check "R11 master project edit still blocked" 2 "$master" Edit "$master/src/x.ts"
+# The message says why, rather than the generic "create a feature branch".
+msgcheck "R11 Edit message names the rule" "edited by the user only" "$feature" Edit "$shared/POLICY.md"
+msgcheck "R11 shell message names the rule" "edited by the user only" "$feature" Bash "echo hi >> $shared/POLICY.md"
+
+echo "== R12: with no 'Shared conventions folder' line the guard behaves as before"
+check "R12 no line: Edit in the shared folder blocked while the project is on master" 2 "$noline" Edit "$shared/POLICY.md"
+# A shell write outside the project was always allowed on master (see R4), and without the
+# line the guard cannot tell this folder from any other outside folder: that is the old
+# behaviour, kept as is. Only the line makes the shell block (R11).
+both "R12 no line: shell write into the shared folder allowed as before (outside the project)" 0 "$noline" "echo hi >> $shared/POLICY.md"
+msgcheck "R12 no line: generic message" "Create a feature branch" "$noline" Edit "$shared/POLICY.md"
+msgcheck "R12 no line: no shared-folder message" "BLOCKED: You are on" "$noline" Edit "$shared/POLICY.md"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" = 0 ]
