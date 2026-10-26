@@ -26,3 +26,17 @@ This repo is the workflow itself: a Claude Code plugin (skills, guard hooks, tru
 - PWF-001 to PWF-027 and their records are history: do not change them.
 - Shell scripts and git hooks keep LF line endings (`.gitattributes`).
 - Matt's skills are called by name (`mattpocock-skills:…`), never copied. His plugin is pinned by commit in `.claude-plugin/marketplace.json`; moving the pin is a normal PWF change that is tested first.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs are local markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context. See `docs/agents/domain.md`.
