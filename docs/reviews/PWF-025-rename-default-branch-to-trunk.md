@@ -67,6 +67,14 @@ The re-reviewer checked the fix and every explanation. It accepted all ten expla
 **Re-review (round 1):** R1 accepted
 **Round 1 clean:** yes
 
+### Round 2
+Triggered by the user's request before check-in. Asked about the two failed guard-test cases, the user wanted to know whether the removed case covered real trunk protection and, if so, to have it replaced. It did not: it was `git branch -f other HEAD`, which names a branch called "other" and so said nothing about trunk, and the main-folder guard has always allowed force-creating a branch (it blocks only forced deletion, as the master tests also show). The master tests do block forced deletion, though, and the trunk section had no forced-delete case naming trunk. Commit 42b9dfe adds `git branch -D trunk` and `git branch --delete --force trunk` to the "trunk blocks" list. The author ran just those two commands against the real guard hook with the main folder on trunk, through both shell tools: all four runs were blocked (exit 2). The full 867-case guard run (round 1) was made before this commit and not repeated; the requirements trace below therefore still describes that run, with these two cases checked separately.
+
+The re-reviewer accepted the replacement. It confirmed the block comes from the guard's forced-delete rule (which does not look at the branch name) and not from an unreadable branch, since the test repo has a commit; the cases mirror the master equivalents, sit in the right list and change nothing else; and no real gap remains between the master and trunk sections (the other master forms are generic rules that do not depend on the branch name). It raised no new finding.
+
+**Re-review (round 2):** R1 accepted
+**Round 2 clean:** yes
+
 ## Requirements trace
 | Requirement | Test | Result |
 |---|---|---|
