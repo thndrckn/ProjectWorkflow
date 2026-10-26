@@ -40,3 +40,8 @@ Entry format:
 - **Change:** PWF-025
 - **Date:** 2026-10-26
 - **Reason:** A check-in cannot edit the lock's own settings, so CLAUDE.md's lock labels and "Default branch" value are changed by hand, with the lock off, after the renamed checker and skills are checked in. Reading either label (the new one first) means the lock and `/commit-change` work both before and after that hand edit, in either order, instead of failing closed in between. The guard hooks likewise keep `master` and `main` guarded next to `trunk`, so no name loses protection.
+
+## Projects load the trunk lock from ProjectWorkflow's release/ folder by absolute path
+- **Change:** PWF-028
+- **Date:** 2026-10-26
+- **Reason:** The workflow became a plugin that projects adopt instead of carrying copies, so `adopt.sh` points a project's `core.hooksPath` at the absolute `release/githooks` folder of ProjectWorkflow, a worktree checked out at a local tag. This replaces the relative `.githooks` choice recorded for PWF-017: one stable copy is shared by every project and moves only when the tag does. A lock loaded from outside the project counts as present, so its fail-closed checks apply. The skills `/plan-change`, `/code-change` and `/commit-change` that other entries here describe were replaced by `/design-change`, `/plan-small-change`, `/plan-large-change`, `/code-change` and `/merge-change`; the single-folder fallback of `/code-change` was dropped, and the number-claim placeholder, the CHANGELOG-only catch-up rule and the missing-backup-line fallbacks were kept in the new skills.

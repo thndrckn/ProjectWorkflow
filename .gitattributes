@@ -1,0 +1,4 @@
+# Shell scripts and git hooks run under sh on every platform: keep their line endings as LF
+# even where git would otherwise convert to CRLF on checkout.
+*.sh text eol=lf
+githooks/reference-transaction text eol=lf
