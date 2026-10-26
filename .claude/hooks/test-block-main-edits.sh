@@ -218,6 +218,9 @@ done
 # On master every two-word `git config` was already blocked (the older rule), so only the worktree case is new.
 bothc "worktree allows: git config get core.hooksPath" 0 "$master" "$wt" 'git config get core.hooksPath'
 
+# Numbering note: R11 and R12 below are this script's own section numbers (R1-R10 above are
+# the earlier groups). They cover the PWF-022 plan's requirements R1, R2, R3 and R8: R11 is
+# the rule with the CLAUDE.md line present, R12 is the same project with the line absent.
 echo "== R11: the shared conventions folder is the user's alone, on every branch"
 shared="$tmp/shared-conventions"; mkdir "$shared"; echo policy > "$shared/POLICY.md"
 winshared=$(cygpath -m "$shared" 2>/dev/null || echo "$shared")
@@ -252,6 +255,16 @@ for repo in "$master" "$feature"; do
   done
   both "R11 $(basename "$repo") allows reading the shared folder" 0 "$repo" "cat $shared/POLICY.md"
 done
+# The folder may be spelled the Windows way, and a relative path is placed from the cwd.
+for repo in "$master" "$feature"; do
+  both "R11 $(basename "$repo") blocks the Windows spelling" 2 "$repo" "echo hi >> $winshared/POLICY.md"
+  bothc "R11 $(basename "$repo") blocks a relative path from a sibling folder" 2 "$repo" "$other" "echo hi > ../shared-conventions/POLICY.md"
+  bothc "R11 $(basename "$repo") blocks a bare file name when the cwd is the shared folder" 2 "$repo" "$shared" "echo hi > POLICY.md"
+  bothc "R11 $(basename "$repo") blocks a write after a cd chain into the folder" 2 "$repo" "$other" "cd .. && cd shared-conventions && echo hi > POLICY.md"
+  bothc "R11 $(basename "$repo") blocks a write after a cd that lands in the folder" 2 "$repo" "$other" "cd ../shared-conventions; touch X.md"
+done
+bothc "R11 feature project: relative write in an unrelated cwd still allowed" 0 "$feature" "$other" "echo hi > local.txt"
+bothc "R11 feature project: a sibling folder whose name starts the same is not blocked" 0 "$feature" "$other" "echo hi > ../shared-conventions-x/a.txt"
 # Not just the master: a feature branch still edits its own files.
 check "R11 feature project edit still allowed" 0 "$feature" Edit "$feature/src/x.ts"
 both "R11 feature project shell write still allowed" 0 "$feature" "echo hi > $feature/x.txt"
@@ -266,6 +279,11 @@ check "R12 no line: Edit in the shared folder blocked while the project is on ma
 # line the guard cannot tell this folder from any other outside folder: that is the old
 # behaviour, kept as is. Only the line makes the shell block (R11).
 both "R12 no line: shell write into the shared folder allowed as before (outside the project)" 0 "$noline" "echo hi >> $shared/POLICY.md"
+# Without the line the folder is just another outside folder: a project on a change branch
+# is not blocked there, as before (CLAUDE.md says so).
+nolinefeature="$tmp/feature-no-line"; mk_repo "$nolinefeature"; git -C "$nolinefeature" switch -q -c chore/ABC-000-y
+printf 'No such line here.\n' > "$nolinefeature/CLAUDE.md"
+check "R12 no line, change branch: Edit in the shared folder allowed as before" 0 "$nolinefeature" Edit "$shared/POLICY.md"
 msgcheck "R12 no line: generic message" "Create a feature branch" "$noline" Edit "$shared/POLICY.md"
 msgcheck "R12 no line: no shared-folder message" "BLOCKED: You are on" "$noline" Edit "$shared/POLICY.md"
 

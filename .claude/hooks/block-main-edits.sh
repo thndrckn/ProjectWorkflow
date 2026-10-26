@@ -75,9 +75,16 @@ if [ -n "$shared" ]; then
   if [ "$tool" = "Bash" ] || [ "$tool" = "PowerShell" ]; then
     # Shared-only pass of the checker: only writes into that folder are judged.
     here=$(cygpath -m "$(dirname "$0")" 2>/dev/null || dirname "$0")
-    sv=$(printf '%s' "$input" | MSYS2_ARG_CONV_EXCL="*" node "$here/shell-command-check.js" "$sn" shared 2>/dev/null)
+    # A command may spell the folder the Git Bash way (/d/..., /tmp/...) or the Windows way
+    # (D:/...), so the checker gets both, and the working directory for relative paths.
+    sm=$(cygpath -m "$shared" 2>/dev/null || printf '%s' "$shared")
+    scwd=$(jget cwd)
+    sv=$(printf '%s' "$input" | MSYS2_ARG_CONV_EXCL="*" node "$here/shell-command-check.js" "$sn" shared "$sm" "$scwd" 2>/dev/null)
     case "$sv" in
+      allow) ;;
       block:*) echo "$shared_msg (${sv#block: })" >&2; exit 2 ;;
+      # The checker crashed or said something unexpected: fail closed, like the main pass.
+      *) echo "$shared_msg (could not check the command)" >&2; exit 2 ;;
     esac
   else
     st=$(jget target)
