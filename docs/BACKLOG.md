@@ -35,3 +35,15 @@ Entry format:
 - **Severity:** Informational
 - **Files:** `githooks/trunk-lock-check.mjs`, `githooks/reference-transaction`
 - **What's wrong:** In a project that keeps the lock inside the project, git has already checked out the incoming branch's files when the hook runs, so a branch could carry a weakened checker. The rule against loosening CLAUDE.md's lock settings does not cover the checker's own code; review is the protection. A project that loads the lock from `release/` is not affected. It was already so before PWF-028.
+
+## The design has no rule for fixes made after the single re-review
+- **Found in:** PWF-028
+- **Severity:** Low
+- **Files:** `docs/workflow-v2.md`, `skills/code-change/SKILL.md`
+- **What's wrong:** The workflow allows one narrow re-review. If that re-review rejects a fix or raises something new, the fixes made after it are checked by nobody, and the record can only say the round was not clean and that Jason decided. Consider a narrow check of those fixes when they are to the lock or guard.
+
+## The gate still skips some unlabelled findings
+- **Found in:** PWF-028
+- **Severity:** Low
+- **Files:** `githooks/trunk-lock-check.mjs`
+- **What's wrong:** In a review record, a finding with no labels is refused only when written as `- [High] text`, `- *[High]* text` or `- **[High]** text`. A lower-case severity, a `*` or numbered bullet, an indented bullet, a heading-style finding or `***` emphasis is silently skipped, so the gate passes. It was already so before PWF-028. A stricter rule would treat any line in the Findings section other than "None" as a finding that must be well formed.
