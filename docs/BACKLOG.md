@@ -47,3 +47,9 @@ Entry format:
 - **Severity:** Nit
 - **Files:** `docs/POLICY.md`
 - **What's wrong:** `docs/workflow-v2.md` says the Light reviewers (Standards and Spec) are each kept short; the Depth paragraph in POLICY.md's Peer review does not say so. Found by the PWF-029 review; PWF-029 did not cause it.
+
+## CLAUDE.md's "never push until Jason says so" does not say what counts as the go-ahead
+- **Found in:** PWF-029
+- **Severity:** Low
+- **Files:** `CLAUDE.md`
+- **What's wrong:** The Rules say never to push until Jason says so, but `/merge-change` pushes the default branch itself. The rule should say that Jason typing `/merge-change` is that go-ahead. Raised by Jason while checking PWF-029.
