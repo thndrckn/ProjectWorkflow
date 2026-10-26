@@ -101,7 +101,7 @@ Two fixes were made after the re-review, authorised by Jason while he checked R5
 | R4 | grep: `/plan-change` and `/commit-change` appear 0 times in `docs/POLICY.md`; `/design-change` 3, `/plan-small-change` 3, `/plan-large-change` 3, `/code-change` 5, `/merge-change` 2, `/build-changes` 2 | Pass |
 | R5 | Manual: Peer review reads against `docs/workflow-v2.md` (Light/Full by merge danger, one narrow re-review, no `Review format` marker, user decides disputes) | Manual |
 | R5a | grep for "by hand", "Policy edits for you" in CLAUDE.md and `docs/POLICY.md`: none except CLAUDE.md line 23 "PWF-028 was built by hand" (history on a lock setting line, left alone on purpose). `hooks/block-main-edits.sh` has no rule naming POLICY.md; the guard test (9 passed) covers edits on a branch | Pass |
-| R6 | Manual: run in PowerShell by Claude: `$bash` with the three bash checks (37, 9 and 9 tests passed), `claude plugin validate .`, and `node githooks/trunk-lock-check.mjs status` (same output as in bash). The lock-install and adopt forms change settings and are for Jason to run once | Manual |
+| R6 | Manual: run in PowerShell by Claude: `$bash` with the three bash checks (37, 9 and 9 tests passed), `claude plugin validate .`, and `node githooks/trunk-lock-check.mjs status` (same output as in bash). The lock-install and adopt forms change settings; Jason ran both in PowerShell and `adopt.sh` ended with "Done" | Pass (checked by Jason) |
 | R7 | The four checks from CLAUDE.md, each run as its own command: trunk lock 37 passed; guard 9 passed; adopt 10 passed; `claude plugin validate .` passed with the expected warnings | Pass |
 
 ## Deviations from the plan
