@@ -1,3 +1,5 @@
+> **Superseded** by `docs/workflow-v2.md` (PWF-028). Kept below as the design before the rebuild.
+
 # ProjectWorkflow — design
 
 Status: agreed in a grilling session, 2026-10-26. Nothing is built yet. The first change, PWF-001, builds from this document.
