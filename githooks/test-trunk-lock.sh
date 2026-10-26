@@ -59,6 +59,15 @@ record() {
     manual) row='| R1 | a test | Manual |' ;;
     none) finding='None' ;;
     bare) finding='- [High] a thing with no labels' ;;
+    lower) finding='- [high] a thing with no labels' ;;
+    lowerbold) finding='- **[high]** a thing with no labels' ;;
+    starbullet) finding='* [High] a thing with no labels' ;;
+    numbered) finding='1. [High] a thing with no labels' ;;
+    indented) finding='  - [High] a thing with no labels' ;;
+    indentedafter) finding="$finding"$'\n''  - [High] sneaky, after a real finding' ;;
+    heading) finding='### [High] a thing with no labels' ;;
+    triple) finding='- ***[High]*** a thing with no labels' ;;
+    prose) finding='Something went wrong here.' ;;
   esac
   [ "$level" = '' ] && level_line='' || level_line="- **Level:** $level"
   printf '# Review: x\n- **Change:** x\n%s\n\n## Findings\n%s\n\n## Re-review\n**Re-review clean:** %s\n\n## Requirements trace\n| Requirement | Test | Result |\n|---|---|---|\n%s\n\n## Summary\nx\n' "$level_line" "$finding" "$clean" "$row"
@@ -72,7 +81,9 @@ gate() { (cd "$r" && node githooks/trunk-lock-check.mjs gate "${1:-$n}"); }
 put ok;               expect 0 "passed" "a complete record passes" gate
 put none;             expect 0 "passed" "no findings passes" gate
 put nolevel;          expect 1 "Level" "a missing level fails" gate
-put bare;             expect 1 "no severity" "a finding with a bare severity and no labels fails" gate
+for form in bare lower lowerbold starbullet numbered indented indentedafter heading triple prose; do
+  put $form;          expect 1 "not understood" "an unlabelled or oddly written finding ($form) is refused" gate
+done
 put nooutcome;       expect 1 "no outcome" "a finding without an outcome fails" gate
 put noreview;         expect 1 "Re-review: accepted/rejected" "a fixed finding without a re-review line fails" gate
 put rejected;         expect 1 "Decided by: Jason" "a rejection without Jason's decision fails" gate

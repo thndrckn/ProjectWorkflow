@@ -161,6 +161,26 @@ function traceRows(body) {
   return rows;
 }
 
+// The Findings section holds only "None" and well-formed findings: a line starting `- **[Severity]**`,
+// followed by indented lines (labels or plain text, never a bullet or heading). Any other line is
+// refused, so a finding written in some other form cannot be silently skipped by the gate.
+const FINDING_START = /^- \*\*\[(?:High|Medium|Low|Nit|Informational)\]\*\*/;
+function unreadableFindingLines(body) {
+  const bad = [];
+  let inFinding = false;
+  for (const line of body.split('\n')) {
+    if (line.trim() === '') continue;
+    if (/^(?:- )?none\.?\s*$/i.test(line.trim()) && !/^\s/.test(line)) { inFinding = false; continue; }
+    if (FINDING_START.test(line)) { inFinding = true; continue; }
+    const indented = /^\s+\S/.test(line);
+    const bulletOrHeading = /^\s*(?:[-*+]\s|\d+[.)]\s|#)/.test(line);
+    if (inFinding && indented && !bulletOrHeading) continue;
+    bad.push(line.trim().slice(0, 60));
+    inFinding = false;
+  }
+  return bad;
+}
+
 // Returns { failures } for one record's text.
 function evaluateRecord(raw) {
   const text = raw.replace(/\r\n/g, '\n');
@@ -170,6 +190,9 @@ function evaluateRecord(raw) {
 
   const findingsBody = sectionStarting(sections, 'findings');
   if (findingsBody === null) failures.push('The record has no Findings section (write "None" if there are none).');
+  for (const l of unreadableFindingLines(findingsBody ?? '')) {
+    failures.push(`A line in Findings is neither "None" nor a well-formed finding ("- **[Severity]** …"), so it is not understood: "${l}".`);
+  }
   for (const b of findingBlocks(findingsBody ?? '')) failures.push(...judgeFinding(b));
 
   const reBody = sectionStarting(sections, 're-review');
