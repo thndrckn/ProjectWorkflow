@@ -57,6 +57,11 @@ record() {
 **Decided by:** Jason' ;;
     fail) row='| R1 | a test | Fail |' ;;
     manual) row='| R1 | a test | Manual |' ;;
+    manuallower) row='| R1 | a test | manual |' ;;
+    manualupper) row='| R1 | a test | MANUAL |' ;;
+    empty) row='| R1 | a test |  |' ;;
+    tbd) row='| R1 | a test | TBD |' ;;
+    manualfail) row=$'| R1 | a test | Manual |\n| R2 | another | Fail |' ;;
     none) finding='None' ;;
     bare) finding='- [High] a thing with no labels' ;;
     lower) finding='- [high] a thing with no labels' ;;
@@ -93,7 +98,12 @@ put caused-backlog;   expect 1 "moved to the backlog" "a caused finding moved to
 put notclean;         expect 1 "not clean" "a re-review that is not clean fails" gate
 put notclean-decided; expect 0 "passed" "a not-clean re-review decided by Jason passes" gate
 put fail;             expect 1 "failed its test" "a failed requirement fails" gate
-put manual;           expect 1 "no passing result" "a manual requirement not yet run fails" gate
+put manual;           expect 0 "passed" "a Manual result does not block the gate" gate
+put manuallower;      expect 0 "passed" "manual in lower case passes" gate
+put manualupper;      expect 0 "passed" "MANUAL in capitals passes" gate
+put empty;            expect 1 "no passing result" "an empty result fails" gate
+put tbd;              expect 1 "no passing result" "an unrecognised result (TBD) fails" gate
+put manualfail;       expect 1 "failed its test" "a Manual row does not hide a Fail row" gate
 rm "$r/docs/reviews/$n-x.md"; expect 1 "no review record" "a missing record fails" gate
 expect 1 "not a change or ticket number" "another prefix fails" gate ABC-031
 
