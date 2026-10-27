@@ -59,6 +59,7 @@ record() {
     manual) row='| R1 | a test | Manual |' ;;
     manuallower) row='| R1 | a test | manual |' ;;
     manualupper) row='| R1 | a test | MANUAL |' ;;
+    manualnote) row='| R1 | a test | Manual-fail |' ;;
     empty) row='| R1 | a test |  |' ;;
     tbd) row='| R1 | a test | TBD |' ;;
     manualfail) row=$'| R1 | a test | Manual |\n| R2 | another | Fail |' ;;
@@ -101,6 +102,7 @@ put fail;             expect 1 "failed its test" "a failed requirement fails" ga
 put manual;           expect 0 "passed" "a Manual result does not block the gate" gate
 put manuallower;      expect 0 "passed" "manual in lower case passes" gate
 put manualupper;      expect 0 "passed" "MANUAL in capitals passes" gate
+put manualnote;       expect 1 "no passing result" "Manual with anything after it (Manual-fail) fails" gate
 put empty;            expect 1 "no passing result" "an empty result fails" gate
 put tbd;              expect 1 "no passing result" "an unrecognised result (TBD) fails" gate
 put manualfail;       expect 1 "failed its test" "a Manual row does not hide a Fail row" gate
