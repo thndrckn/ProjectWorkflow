@@ -53,3 +53,9 @@ Entry format:
 - **Severity:** Low
 - **Files:** `CLAUDE.md`
 - **What's wrong:** The Rules say never to push until Jason says so, but `/merge-change` pushes the default branch itself. The rule should say that Jason typing `/merge-change` is that go-ahead. Raised by Jason while checking PWF-029.
+
+## /plan-small-change always labels the request "Original request (set aside)"
+- **Found in:** PWF-031
+- **Severity:** Nit
+- **Files:** `skills/plan-small-change/SKILL.md`
+- **What's wrong:** The plan template labels the word-for-word request "Original request (set aside)" even when nothing was set aside. The label should be "Original request", and "Original request (set aside)" only when "plan it now" actually set it aside. Raised by Jason while approving PWF-031.

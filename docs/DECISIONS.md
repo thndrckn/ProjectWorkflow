@@ -45,3 +45,8 @@ Entry format:
 - **Change:** PWF-028
 - **Date:** 2026-10-26
 - **Reason:** The workflow became a plugin that projects adopt instead of carrying copies, so `adopt.sh` points a project's `core.hooksPath` at the absolute `release/githooks` folder of ProjectWorkflow, a worktree checked out at a local tag. This replaces the relative `.githooks` choice recorded for PWF-017: one stable copy is shared by every project and moves only when the tag does. A lock loaded from outside the project counts as present, so its fail-closed checks apply. The skills `/plan-change`, `/code-change` and `/commit-change` that other entries here describe were replaced by `/design-change`, `/plan-small-change`, `/plan-large-change`, `/code-change` and `/merge-change`; the single-folder fallback of `/code-change` was dropped, and the number-claim placeholder, the CHANGELOG-only catch-up rule and the missing-backup-line fallbacks were kept in the new skills.
+
+## The review gate accepts "Manual" as the result of a manual check
+- **Change:** PWF-031
+- **Date:** 2026-10-26
+- **Reason:** Jason owns manual testing and check-in is his sign-off, so a manual check does not block a check-in. PWF-028's gate was stricter than that rule (it refused any result that was not a Pass). Now `Pass` and `Manual` pass, `Fail` fails, and anything else (blank, "TBD") still fails so a forgotten result is not taken for a manual check. If a manual check was run, its result says so (`Pass` or `Fail`).

@@ -206,7 +206,7 @@ function evaluateRecord(raw) {
   if (trace.length === 0) failures.push('The record has no requirements trace.');
   for (const r of trace) {
     if (/^fail/i.test(r.result)) failures.push(`Requirement ${r.id} failed its test.`);
-    else if (!/^pass/i.test(r.result)) failures.push(`Requirement ${r.id} has no passing result (it reads "${r.result}").`);
+    else if (!/^(pass|manual$)/i.test(r.result)) failures.push(`Requirement ${r.id} has no passing result (it reads "${r.result}").`);
   }
   return { failures };
 }
