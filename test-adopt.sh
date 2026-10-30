@@ -34,7 +34,9 @@ dir=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")
 [ "$scope" = project ] && p=$dir || p=-
 case "$1 $2" in
   "plugin marketplace") case "$3" in add) echo projectworkflow >> "$STATE.m" ;; list) cat "$STATE.m" 2>/dev/null ;; esac ;;
-  "plugin install") [ -n "${FAILINSTALL:-}" ] && exit 1; echo "$3|$scope|$p" >> "$STATE" ;;
+  "plugin install") [ -n "${FAILINSTALL:-}" ] && exit 1; echo "$3|$scope|$p" >> "$STATE"
+    # like the real one: a project-scope install writes .claude/settings.json with plain (LF) line endings
+    [ "$scope" = project ] && { mkdir -p .claude; printf '{\n  "enabledPlugins": {\n    "%s": true\n  }\n}\n' "$3" > .claude/settings.json; } ;;
   "plugin uninstall") grep -vxF "$3|$scope|$p" "$STATE" > "$STATE.n"; mv "$STATE.n" "$STATE" ;;
   "plugin list") [ -n "${BADLIST:-}" ] && { echo "unknown option --json"; exit 1; }; node -e '
     const l = require("fs").readFileSync(process.env.STATE, "utf8").split("\n").filter(Boolean).map(x => x.split("|"));
@@ -51,6 +53,7 @@ git -C "$proj" add -A; git -C "$proj" commit -q -m "chore(ABC-001): init"
 lonely="$tmp/lonely"; mkdir -p "$lonely"; cp "$here/adopt.sh" "$lonely/"
 expect 1 "release/ is not set up" "stops when release/ is missing" bash "$lonely/adopt.sh" "$proj"
 
+bash "$pw/adopt.sh" "$proj" > "$tmp/first-run" 2>&1   # the first run's output, read by the .gitattributes checks below
 expect 1 "/setup-matt-pocock-skills" "stops and names Matt's setup when it was not done" bash "$pw/adopt.sh" "$proj"
 expect 0 "Trunk lock: ON" "the lock is on in the project" bash -c "cd '$proj' && node '$pw/release/githooks/trunk-lock-check.mjs' status"
 [ "$(git -C "$proj" config core.hooksPath)" = "$(cygpath -m "$pw/release/githooks" 2>/dev/null || echo "$pw/release/githooks")" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: hooksPath points at release/githooks"; }
@@ -132,6 +135,53 @@ git -C "$proj4" add -A; git -C "$proj4" commit -q -m "chore(ABC-001): init"
 installs=$(grep -c "plugin install" "$tmp/log")
 expect 1 "Workflow heading" "stops when CLAUDE.md has no Workflow heading" bash "$pw/adopt.sh" "$proj4"
 [ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: installed a plugin in a project with no Workflow heading"; }
+
+# PWF-033: .claude/settings.json is always plain (LF) endings, so a plugin install leaves git clean.
+rule='.claude/settings.json text eol=lf'
+# R1: this repo has the rule, and git applies it to the file.
+grep -qxF "$rule" "$here/.gitattributes" && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: this repo's .gitattributes has the settings.json rule"; }
+attrs=$(git -C "$here" check-attr text eol -- .claude/settings.json)
+[[ "$attrs" == *"text: set"* && "$attrs" == *"eol: lf"* ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: git applies text eol=lf to .claude/settings.json ($attrs)"; }
+# R2: the first run on proj (it had no .gitattributes) created one with the rule and said to commit it.
+[ "$(cat "$proj/.gitattributes" 2>/dev/null)" = "$rule" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: adopt.sh created .gitattributes with the rule"; }
+grep -q "gitattributes. That file needs committing" "$tmp/first-run" 2>/dev/null && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: adopt.sh said the new .gitattributes needs committing"; }
+# R3, R4: a project's own rules stay (even with no final newline), the line is added once, and a second run
+# changes nothing and says nothing about it.
+proj5="$tmp/project5"; git init -q -b trunk "$proj5"; mkdir -p "$proj5/docs/agents"; : > "$proj5/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj5/"; printf '*.png binary\n*.sh text eol=lf' > "$proj5/.gitattributes"
+git -C "$proj5" add -A; git -C "$proj5" commit -q -m "chore(ABC-001): init"
+expect 0 "That file needs committing" "adopt.sh tells the owner to commit a changed .gitattributes" bash "$pw/adopt.sh" "$proj5"
+[ "$(cat "$proj5/.gitattributes")" = "$(printf '*.png binary\n*.sh text eol=lf\n%s' "$rule")" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: the project's own rules were kept and the line added once"; }
+sum=$(cksum < "$proj5/.gitattributes"); out=$(bash "$pw/adopt.sh" "$proj5" 2>&1)
+[ "$(cksum < "$proj5/.gitattributes")" = "$sum" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a second run changed .gitattributes"; }
+[[ "$out" == *gitattributes* ]] && { fail=$((fail+1)); echo "FAIL: a run that changed nothing still mentioned .gitattributes"; } || pass=$((pass+1))
+# R3 again: a .gitattributes with Windows line endings (what git makes of it here), last line ending in a
+# newline. The rule is added once; a second run does not add it again.
+proj6="$tmp/project6"; git init -q -b trunk "$proj6"; mkdir -p "$proj6/docs/agents"; : > "$proj6/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj6/"; printf '*.png binary\r\n' > "$proj6/.gitattributes"
+git -C "$proj6" add -A 2>/dev/null; git -C "$proj6" commit -q -m "chore(ABC-001): init"
+bash "$pw/adopt.sh" "$proj6" >/dev/null 2>&1; bash "$pw/adopt.sh" "$proj6" >/dev/null 2>&1
+[ "$(grep -cF "$rule" "$proj6/.gitattributes")" = 1 ] && [ "$(head -c 14 "$proj6/.gitattributes")" = "$(printf '*.png binary\r\n' | head -c 14)" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a Windows-ended .gitattributes got the rule once and kept its own line"; }
+proj7="$tmp/project7"; git init -q -b trunk "$proj7"; mkdir -p "$proj7/docs/agents"; : > "$proj7/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj7/"; printf '*.png binary\r\n%s\r\n' "$rule" > "$proj7/.gitattributes"   # the rule is already there, Windows-ended
+git -C "$proj7" add -A 2>/dev/null; git -C "$proj7" commit -q -m "chore(ABC-001): init"
+sum=$(cksum < "$proj7/.gitattributes"); out=$(bash "$pw/adopt.sh" "$proj7" 2>&1)
+[ "$(cksum < "$proj7/.gitattributes")" = "$sum" ] && [[ "$out" != *gitattributes* ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a rule already in a Windows-ended .gitattributes was added again"; }
+# R5: where git converts line endings, an install that rewrites the file with plain endings leaves git clean.
+git -C "$proj5" config core.autocrlf true
+git -C "$proj5" add -A 2>/dev/null; git -C "$proj5" commit -q -m "chore(ABC-002): adopt"
+rm "$proj5/.claude/settings.json"; git -C "$proj5" checkout -- .claude/settings.json
+(cd "$proj5" && "$CLAUDE" plugin install mattpocock-skills@projectworkflow --scope project >/dev/null)   # same content as adopt.sh's last install wrote
+[ -z "$(git -C "$proj5" status --short 2>/dev/null)" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: an install left git status dirty: $(git -C "$proj5" status --short)"; }
+# R7 (second half): a file checked out with Windows endings, then the rule added and the file checked out once more.
+rep="$tmp/repo7"; git init -q -b trunk "$rep"; git -C "$rep" config core.autocrlf true; mkdir "$rep/.claude"
+printf '{\n  "a": 1\n}\n' > "$rep/.claude/settings.json"; git -C "$rep" add -A 2>/dev/null; git -C "$rep" commit -q -m "chore(ABC-001): init"
+rm "$rep/.claude/settings.json"; git -C "$rep" checkout -- .claude/settings.json
+[[ "$(git -C "$rep" ls-files --eol .claude/settings.json)" == *"w/crlf"* ]] || { fail=$((fail+1)); echo "FAIL: the stand-in repo did not start with Windows endings"; }
+echo "$rule" > "$rep/.gitattributes"; git -C "$rep" add -A 2>/dev/null; git -C "$rep" commit -q -m "chore(ABC-002): rule"
+rm "$rep/.claude/settings.json"; git -C "$rep" checkout -- .claude/settings.json
+eol=$(git -C "$rep" ls-files --eol .claude/settings.json)
+[[ "$eol" == *"w/lf"* && "$eol" == *"text eol=lf"* ]] && [ -z "$(git -C "$rep" status --short)" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: re-checkout with the rule gives plain endings and a clean status ($eol)"; }
 
 sed -i '/Change prefix/d' "$proj/CLAUDE.md"
 expect 1 "no \"Change prefix\" line" "stops when CLAUDE.md lacks a lock setting" bash "$pw/adopt.sh" "$proj"

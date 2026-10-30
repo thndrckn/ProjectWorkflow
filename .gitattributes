@@ -2,3 +2,7 @@
 # even where git would otherwise convert to CRLF on checkout.
 *.sh text eol=lf
 githooks/reference-transaction text eol=lf
+
+# The plugin settings file is written by `claude plugin install` with plain line endings; keeping it LF
+# here means a fresh install leaves git status clean where git would otherwise convert to CRLF.
+.claude/settings.json text eol=lf

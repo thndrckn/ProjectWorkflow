@@ -27,7 +27,7 @@ This repo is the workflow itself: a Claude Code plugin (skills, guard hooks, tru
 ## Rules
 - Never commit to trunk, never force-push, and never push until Jason says so.
 - PWF-001 to PWF-027 and their records are history: do not change them.
-- Shell scripts and git hooks keep LF line endings (`.gitattributes`).
+- Shell scripts, git hooks and `.claude/settings.json` (the plugin install rewrites it with LF) keep LF line endings (`.gitattributes`); `adopt.sh` adds that last rule to projects it sets up.
 - Matt's skills are called by name (`mattpocock-skills:…`), never copied. His plugin is pinned by commit in `.claude-plugin/marketplace.json`; moving the pin is a normal PWF change that is tested first.
 
 ## Agent skills

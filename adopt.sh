@@ -38,6 +38,17 @@ done
 . "$here/hooks/adopted.sh"
 workflow_adopted "$proj" || stop "the project's CLAUDE.md has no Workflow heading (a line such as \"## Workflow\"); the guard stays off without it."
 
+# The plugin install writes .claude/settings.json with plain (LF) line endings. Where git converts line endings
+# on checkout, that makes the file show as modified, so the project says the file is always LF. Only this one
+# line is added (never twice, the project's own lines stay), and the owner commits it.
+rule='.claude/settings.json text eol=lf'
+attrs="$proj/.gitattributes"
+if ! tr -d '\r' < "$attrs" 2>/dev/null | grep -qxF "$rule"; then   # tr: git may have made the file's lines end in CRLF
+  [ -s "$attrs" ] && [ -n "$(tail -c1 "$attrs")" ] && echo >> "$attrs"   # the project's last line had no newline
+  echo "$rule" >> "$attrs" || stop "could not write $attrs."
+  echo "Added \"$rule\" to $attrs. That file needs committing in the project."
+fi
+
 # 2. Plugins (Matt's official copy must not also be installed, or the skills would load twice)
 # Installed for this project only (project scope), so projects that have not adopted the workflow get neither
 # its commands nor its edit guard. Copies at user scope (every project) are removed once the project ones are in.
