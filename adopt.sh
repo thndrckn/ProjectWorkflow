@@ -43,7 +43,7 @@ workflow_adopted "$proj" || stop "the project's CLAUDE.md has no Workflow headin
 # line is added (never twice, the project's own lines stay), and the owner commits it.
 rule='.claude/settings.json text eol=lf'
 attrs="$proj/.gitattributes"
-if ! grep -qxF "$rule" "$attrs" 2>/dev/null; then
+if ! tr -d '\r' < "$attrs" 2>/dev/null | grep -qxF "$rule"; then   # tr: git may have made the file's lines end in CRLF
   [ -s "$attrs" ] && [ -n "$(tail -c1 "$attrs")" ] && echo >> "$attrs"   # the project's last line had no newline
   echo "$rule" >> "$attrs" || stop "could not write $attrs."
   echo "Added \"$rule\" to $attrs. That file needs committing in the project."

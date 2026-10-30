@@ -144,17 +144,29 @@ attrs=$(git -C "$here" check-attr text eol -- .claude/settings.json)
 [[ "$attrs" == *"text: set"* && "$attrs" == *"eol: lf"* ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: git applies text eol=lf to .claude/settings.json ($attrs)"; }
 # R2: the first run on proj (it had no .gitattributes) created one with the rule and said to commit it.
 [ "$(cat "$proj/.gitattributes" 2>/dev/null)" = "$rule" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: adopt.sh created .gitattributes with the rule"; }
-grep -q "gitattributes" "$tmp/first-run" 2>/dev/null && grep -q "commit" "$tmp/first-run" && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: adopt.sh said the new .gitattributes needs committing"; }
+grep -q "gitattributes. That file needs committing" "$tmp/first-run" 2>/dev/null && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: adopt.sh said the new .gitattributes needs committing"; }
 # R3, R4: a project's own rules stay (even with no final newline), the line is added once, and a second run
 # changes nothing and says nothing about it.
 proj5="$tmp/project5"; git init -q -b trunk "$proj5"; mkdir -p "$proj5/docs/agents"; : > "$proj5/docs/agents/issue-tracker.md"
 cp "$proj/CLAUDE.md" "$proj5/"; printf '*.png binary\n*.sh text eol=lf' > "$proj5/.gitattributes"
 git -C "$proj5" add -A; git -C "$proj5" commit -q -m "chore(ABC-001): init"
-expect 0 "commit" "adopt.sh tells the owner to commit a changed .gitattributes" bash "$pw/adopt.sh" "$proj5"
+expect 0 "That file needs committing" "adopt.sh tells the owner to commit a changed .gitattributes" bash "$pw/adopt.sh" "$proj5"
 [ "$(cat "$proj5/.gitattributes")" = "$(printf '*.png binary\n*.sh text eol=lf\n%s' "$rule")" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: the project's own rules were kept and the line added once"; }
 sum=$(cksum < "$proj5/.gitattributes"); out=$(bash "$pw/adopt.sh" "$proj5" 2>&1)
 [ "$(cksum < "$proj5/.gitattributes")" = "$sum" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a second run changed .gitattributes"; }
 [[ "$out" == *gitattributes* ]] && { fail=$((fail+1)); echo "FAIL: a run that changed nothing still mentioned .gitattributes"; } || pass=$((pass+1))
+# R3 again: a .gitattributes with Windows line endings (what git makes of it here), last line ending in a
+# newline. The rule is added once; a second run does not add it again.
+proj6="$tmp/project6"; git init -q -b trunk "$proj6"; mkdir -p "$proj6/docs/agents"; : > "$proj6/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj6/"; printf '*.png binary\r\n' > "$proj6/.gitattributes"
+git -C "$proj6" add -A 2>/dev/null; git -C "$proj6" commit -q -m "chore(ABC-001): init"
+bash "$pw/adopt.sh" "$proj6" >/dev/null 2>&1; bash "$pw/adopt.sh" "$proj6" >/dev/null 2>&1
+[ "$(grep -cF "$rule" "$proj6/.gitattributes")" = 1 ] && [ "$(head -c 14 "$proj6/.gitattributes")" = "$(printf '*.png binary\r\n' | head -c 14)" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a Windows-ended .gitattributes got the rule once and kept its own line"; }
+proj7="$tmp/project7"; git init -q -b trunk "$proj7"; mkdir -p "$proj7/docs/agents"; : > "$proj7/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj7/"; printf '*.png binary\r\n%s\r\n' "$rule" > "$proj7/.gitattributes"   # the rule is already there, Windows-ended
+git -C "$proj7" add -A 2>/dev/null; git -C "$proj7" commit -q -m "chore(ABC-001): init"
+sum=$(cksum < "$proj7/.gitattributes"); out=$(bash "$pw/adopt.sh" "$proj7" 2>&1)
+[ "$(cksum < "$proj7/.gitattributes")" = "$sum" ] && [[ "$out" != *gitattributes* ]] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a rule already in a Windows-ended .gitattributes was added again"; }
 # R5: where git converts line endings, an install that rewrites the file with plain endings leaves git clean.
 git -C "$proj5" config core.autocrlf true
 git -C "$proj5" add -A 2>/dev/null; git -C "$proj5" commit -q -m "chore(ABC-002): adopt"
