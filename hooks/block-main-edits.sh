@@ -9,6 +9,10 @@
 proj="${CLAUDE_PROJECT_DIR:-.}"
 input=$(cat)
 
+# Only guard a project that has adopted the workflow (see adopted.sh).
+. "$(dirname "$0")/adopted.sh"
+workflow_adopted "$proj" || exit 0
+
 # Lowercase, forward-slash form, so Windows (D:\...) and Git Bash (/d/...) paths compare equal.
 norm() {
   local p

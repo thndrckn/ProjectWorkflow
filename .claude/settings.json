@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "projectworkflow@projectworkflow": true,
+    "mattpocock-skills@projectworkflow": true
+  }
+}

@@ -2,7 +2,8 @@
 # Sets up the ProjectWorkflow in a project. Run it yourself, in your own terminal:
 #   bash adopt.sh [project folder]        (the project defaults to the current folder)
 # It turns on the trunk lock in the project, installs this plugin and Matt Pocock's pinned plugin
-# from this repo's release/ folder, and checks that Matt's one-time setup was done. Safe to run again.
+# from this repo's release/ folder for this project only (project scope; any copy installed for every
+# project is removed), and checks that Matt's one-time setup was done. Safe to run again.
 # It changes settings on your machine (plugins, the project's git hooks), which is why you run it.
 # Set CLAUDE to another program to try it without touching your real plugins (the tests do).
 
@@ -35,7 +36,20 @@ for line in 'Default branch' 'Change prefix' 'Version files' 'Trunk lock starts 
 done
 
 # 2. Plugins (Matt's official copy must not also be installed, or the skills would load twice)
-listing=$("$claude_bin" plugin list 2>/dev/null)
+# The plugins are installed for this project only (project scope), so projects that have not adopted the
+# workflow do not get its commands or its edit guard. Copies at user scope (every project) are removed once
+# the project ones are in. The listing is "<plugin> <scope>" per line: user-scope installs, and project-scope
+# installs for this project folder only (the folder is compared in one spelling, whatever case and slashes).
+projkey=$(cygpath -m "$proj" 2>/dev/null || echo "$proj")
+installed() {
+  "$claude_bin" plugin list --json 2>/dev/null | node -e '
+    const key = p => String(p).replace(/\\/g, "/").toLowerCase();
+    let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
+      let l = []; try { l = JSON.parse(s); } catch (e) {}
+      for (const p of l) if (p.scope === "user" || (p.scope === "project" && key(p.projectPath) === key(process.argv[1]))) console.log(p.id + " " + p.scope);
+    });' "$projkey"
+}
+listing=$(installed)
 case "$listing" in *mattpocock-skills@claude-plugins-official*)
   stop "Matt's skills are installed from the official marketplace. Remove that copy, then run this again: $claude_bin plugin uninstall mattpocock-skills@claude-plugins-official" ;;
 esac
@@ -44,9 +58,14 @@ case "$markets" in *projectworkflow*) ;; *)
   "$claude_bin" plugin marketplace add "$release" || stop "could not add the ProjectWorkflow marketplace." ;;
 esac
 for p in projectworkflow mattpocock-skills; do
-  case "$listing" in *"$p@projectworkflow"*) echo "Plugin $p is installed." ;; *)
-    "$claude_bin" plugin install "$p@projectworkflow" || stop "could not install $p." ;;
-  esac
+  if printf '%s\n' "$listing" | grep -qxF "$p@projectworkflow project"; then echo "Plugin $p is installed for this project."
+  else (cd "$proj" && "$claude_bin" plugin install "$p@projectworkflow" --scope project) || stop "could not install $p."; fi
+done
+for p in projectworkflow mattpocock-skills; do
+  if printf '%s\n' "$listing" | grep -qxF "$p@projectworkflow user"; then
+    "$claude_bin" plugin uninstall "$p@projectworkflow" --scope user || stop "could not remove the user-scope copy of $p."
+    echo "Removed the user-scope copy of $p (it now loads in adopted projects only)."
+  fi
 done
 
 # 3. The trunk lock, in the project

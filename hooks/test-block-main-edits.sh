@@ -12,15 +12,17 @@ export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER
 
 main="$tmp/main-repo"
 git init -q -b trunk "$main"; mkdir -p "$main/docs/plans"; git -C "$main" commit -q --allow-empty -m init
+# The guard only acts in a project whose CLAUDE.md has a Workflow section.
+printf '# Project\n\n## Workflow\n- **Default branch:** `trunk`\n' > "$main/CLAUDE.md"
 git -C "$main" worktree add -q "$tmp/wt" -b chore/PWF-000-x
 other="$tmp/elsewhere"; mkdir "$other"
 
 pass=0; fail=0
-# check <name> <expected exit> <tool> <file path>   (the hook runs for the main repo's session)
+# check <name> <expected exit> <tool> <file path>   (the hook runs for the main repo's session, or for $proj)
 check() {
   local json code
   json=$(node -e 'console.log(JSON.stringify({tool_name:process.argv[1],tool_input:{file_path:process.argv[2]}}))' "$3" "$4")
-  printf '%s' "$json" | CLAUDE_PROJECT_DIR="$main" bash "$hook" >/dev/null 2>&1
+  printf '%s' "$json" | CLAUDE_PROJECT_DIR="${proj:-$main}" bash "$hook" >/dev/null 2>&1
   code=$?
   if [ "$code" = "$2" ]; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL  $1 (wanted $2, got $code)"; fi
 }
@@ -36,9 +38,24 @@ check "a path climbing out of the worktree into trunk is blocked" 2 Edit "$tmp/w
 git -C "$main" switch -q -c chore/PWF-000-y
 check "an edit on a change branch is allowed" 0 Edit "$main/src.js"
 
-# the plan-mode block always refuses
-bash "$dir/block-plan-mode.sh" >/dev/null 2>&1
+# the plan-mode block refuses in an adopted project
+CLAUDE_PROJECT_DIR="$main" bash "$dir/block-plan-mode.sh" >/dev/null 2>&1
 [ $? = 2 ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL  plan mode is refused"; }
+
+# Projects that have not adopted the workflow: no CLAUDE.md, or one with no Workflow section (a word in
+# a sentence is not a section). Everything is allowed there, on the default branch too.
+for kind in none no-section sentence-only; do
+  proj="$tmp/plain-$kind"; git init -q -b trunk "$proj"
+  case "$kind" in
+    no-section) printf '# Project\n\n## Notes\nstuff\n' > "$proj/CLAUDE.md" ;;
+    sentence-only) printf '# Project\n\nOur workflow is informal.\n' > "$proj/CLAUDE.md" ;;
+  esac
+  git -C "$proj" commit -q --allow-empty -m init   # a real trunk, so only the Workflow check can allow the edit
+  check "an edit on trunk is allowed in a project with $kind Workflow section" 0 Edit "$proj/src.js"
+  CLAUDE_PROJECT_DIR="$proj" bash "$dir/block-plan-mode.sh" >/dev/null 2>&1
+  [ $? = 0 ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL  plan mode is allowed in a project with $kind Workflow section"; }
+done
+proj=""
 
 echo "guard tests: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
