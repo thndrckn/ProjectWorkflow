@@ -55,6 +55,10 @@ for kind in none no-section sentence-only; do
   CLAUDE_PROJECT_DIR="$proj" bash "$dir/block-plan-mode.sh" >/dev/null 2>&1
   [ $? = 0 ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL  plan mode is allowed in a project with $kind Workflow section"; }
 done
+# A heading with more after the word (and Windows line endings) still counts as a Workflow section.
+proj="$tmp/colon"; git init -q -b trunk "$proj"; printf '# Project\r\n\r\n## Workflow: how changes go\r\n' > "$proj/CLAUDE.md"
+git -C "$proj" commit -q --allow-empty -m init
+check "an edit on trunk is blocked when the heading is \"Workflow: ...\" with CRLF line endings" 2 Edit "$proj/src.js"
 proj=""
 
 echo "guard tests: $pass passed, $fail failed"

@@ -16,10 +16,12 @@ expect() { # expect <exit code> <words> <name> <command...>
 
 # A stand-in ProjectWorkflow folder: adopt.sh plus a release/ that is a copy of the real files.
 pw="$tmp/pw"; mkdir -p "$pw/release"
-cp "$here/adopt.sh" "$pw/"
+cp "$here/adopt.sh" "$pw/"; cp -r "$here/hooks" "$pw/"
 cp -r "$here/.claude-plugin" "$here/githooks" "$pw/release/"
 # A stand-in claude: logs every call, remembers marketplaces and installs (id|scope|project folder, - for
-# user scope), and lists them as JSON like the real one. FAILINSTALL=1 makes every install fail.
+# user scope), and lists them as JSON like the real one. FAILINSTALL=1 makes every install fail, BADLIST=1
+# makes the listing unreadable, WINPATH=1 records and lists project folders the way Windows spells them
+# (backslashes, capitals).
 state="$tmp/state"; : > "$state"
 export STATE="$state" LOG="$tmp/log"
 cat > "$tmp/claude" <<'EOF'
@@ -27,13 +29,14 @@ cat > "$tmp/claude" <<'EOF'
 echo "$*" >> "$LOG"
 scope=user; args=("$@")
 for ((i=0; i<${#args[@]}; i++)); do [ "${args[i]}" = "--scope" ] && scope=${args[i+1]}; done
-here=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")
-[ "$scope" = project ] && p=$here || p=-
+dir=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")
+[ -n "${WINPATH:-}" ] && dir=$(echo "$dir" | tr / '\\' | tr a-z A-Z)
+[ "$scope" = project ] && p=$dir || p=-
 case "$1 $2" in
   "plugin marketplace") case "$3" in add) echo projectworkflow >> "$STATE.m" ;; list) cat "$STATE.m" 2>/dev/null ;; esac ;;
   "plugin install") [ -n "${FAILINSTALL:-}" ] && exit 1; echo "$3|$scope|$p" >> "$STATE" ;;
   "plugin uninstall") grep -vxF "$3|$scope|$p" "$STATE" > "$STATE.n"; mv "$STATE.n" "$STATE" ;;
-  "plugin list") node -e '
+  "plugin list") [ -n "${BADLIST:-}" ] && { echo "unknown option --json"; exit 1; }; node -e '
     const l = require("fs").readFileSync(process.env.STATE, "utf8").split("\n").filter(Boolean).map(x => x.split("|"));
     console.log(JSON.stringify(l.map(([id, scope, p]) => p === "-" ? { id, scope } : { id, scope, projectPath: p })));' ;;
 esac
@@ -42,7 +45,7 @@ EOF
 chmod +x "$tmp/claude"; export CLAUDE="$tmp/claude"
 
 proj="$tmp/project"; git init -q -b trunk "$proj"
-printf -- '- **Default branch:** `trunk`\n- **Change prefix:** `ABC`\n- **Version files:** `package.json`\n- **Trunk lock starts at:** `ABC-010`\n' > "$proj/CLAUDE.md"
+printf -- '## Workflow\n- **Default branch:** `trunk`\n- **Change prefix:** `ABC`\n- **Version files:** `package.json`\n- **Trunk lock starts at:** `ABC-010`\n' > "$proj/CLAUDE.md"
 git -C "$proj" add -A; git -C "$proj" commit -q -m "chore(ABC-001): init"
 
 lonely="$tmp/lonely"; mkdir -p "$lonely"; cp "$here/adopt.sh" "$lonely/"
@@ -103,6 +106,32 @@ echo "mattpocock-skills@claude-plugins-official|user|-" >> "$state"
 installs=$(grep -c "plugin install" "$tmp/log")
 expect 1 "plugin uninstall mattpocock-skills@claude-plugins-official" "stops while the official copy is installed" bash "$pw/adopt.sh" "$proj"
 [ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: installed something while the official copy was installed"; }
+
+# The official copy counts at any scope, including project scope for another project.
+grep -vxF "mattpocock-skills@claude-plugins-official|user|-" "$state" > "$state.n"; mv "$state.n" "$state"
+echo "mattpocock-skills@claude-plugins-official|project|/somewhere/else" >> "$state"
+expect 1 "plugin uninstall mattpocock-skills@claude-plugins-official" "stops for an official copy at project scope elsewhere" bash "$pw/adopt.sh" "$proj"
+grep -vxF "mattpocock-skills@claude-plugins-official|project|/somewhere/else" "$state" > "$state.n"; mv "$state.n" "$state"
+
+# A plugin list that cannot be read stops the run before anything is installed or removed.
+installs=$(grep -c "plugin install" "$tmp/log"); removals=$(grep -c "plugin uninstall" "$tmp/log")
+BADLIST=1 expect 1 "could not read the plugin list" "stops when the plugin list cannot be read" bash "$pw/adopt.sh" "$proj"
+[ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && [ "$(grep -c "plugin uninstall" "$tmp/log")" = "$removals" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: an unreadable plugin list still led to an install or removal"; }
+
+# A project folder spelled the Windows way (backslashes, capitals) is still recognised as installed.
+proj3="$tmp/project3"; git init -q -b trunk "$proj3"; mkdir -p "$proj3/docs/agents"; : > "$proj3/docs/agents/issue-tracker.md"
+cp "$proj/CLAUDE.md" "$proj3/"; git -C "$proj3" add -A; git -C "$proj3" commit -q -m "chore(ABC-001): init"
+WINPATH=1 expect 0 "Done" "a project is adopted when the list spells its folder the Windows way" bash "$pw/adopt.sh" "$proj3"
+installs=$(grep -c "plugin install" "$tmp/log")
+WINPATH=1 expect 0 "Done" "adopting again" bash "$pw/adopt.sh" "$proj3"
+[ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: a differently spelled folder was not recognised, so plugins were installed again"; }
+
+# The guard stands down in a project with no Workflow heading, so adopting such a project is refused.
+proj4="$tmp/project4"; git init -q -b trunk "$proj4"; sed '/^## Workflow/d' "$proj/CLAUDE.md" > "$proj4/CLAUDE.md"
+git -C "$proj4" add -A; git -C "$proj4" commit -q -m "chore(ABC-001): init"
+installs=$(grep -c "plugin install" "$tmp/log")
+expect 1 "Workflow heading" "stops when CLAUDE.md has no Workflow heading" bash "$pw/adopt.sh" "$proj4"
+[ "$(grep -c "plugin install" "$tmp/log")" = "$installs" ] && pass=$((pass+1)) || { fail=$((fail+1)); echo "FAIL: installed a plugin in a project with no Workflow heading"; }
 
 sed -i '/Change prefix/d' "$proj/CLAUDE.md"
 expect 1 "no \"Change prefix\" line" "stops when CLAUDE.md lacks a lock setting" bash "$pw/adopt.sh" "$proj"

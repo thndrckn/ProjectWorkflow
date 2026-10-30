@@ -4,5 +4,5 @@
 # everything, so the plugin does no harm in a project that has not adopted the workflow.
 # workflow_adopted <project folder>: succeeds when the folder's CLAUDE.md has that heading.
 workflow_adopted() {
-  grep -qiE '^#+[[:space:]]+workflow([[:space:]]|$)' "$1/CLAUDE.md" 2>/dev/null
+  grep -qiE '^#+[[:space:]]+workflow([^[:alnum:]]|$)' "$1/CLAUDE.md" 2>/dev/null
 }

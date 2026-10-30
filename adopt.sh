@@ -34,22 +34,25 @@ mine=$(common_dir "$here")
 for line in 'Default branch' 'Change prefix' 'Version files' 'Trunk lock starts at'; do
   grep -q "\*\*$line:\*\*" "$proj/CLAUDE.md" || stop "the project's CLAUDE.md has no \"$line\" line in its Workflow section."
 done
+# The guard hooks stand down without this heading, so a project without it would get plugins that do nothing.
+. "$here/hooks/adopted.sh"
+workflow_adopted "$proj" || stop "the project's CLAUDE.md has no Workflow heading (a line such as \"## Workflow\"); the guard stays off without it."
 
 # 2. Plugins (Matt's official copy must not also be installed, or the skills would load twice)
-# The plugins are installed for this project only (project scope), so projects that have not adopted the
-# workflow do not get its commands or its edit guard. Copies at user scope (every project) are removed once
-# the project ones are in. The listing is "<plugin> <scope>" per line: user-scope installs, and project-scope
-# installs for this project folder only (the folder is compared in one spelling, whatever case and slashes).
+# Installed for this project only (project scope), so projects that have not adopted the workflow get neither
+# its commands nor its edit guard. Copies at user scope (every project) are removed once the project ones are in.
+# installed prints "<plugin> <scope>" per line: user-scope installs, this project's own project-scope installs
+# (the folder is compared lowercase with forward slashes), and Matt's official copy at any scope.
 projkey=$(cygpath -m "$proj" 2>/dev/null || echo "$proj")
 installed() {
   "$claude_bin" plugin list --json 2>/dev/null | node -e '
     const key = p => String(p).replace(/\\/g, "/").toLowerCase();
     let s = ""; process.stdin.on("data", d => s += d).on("end", () => {
-      let l = []; try { l = JSON.parse(s); } catch (e) {}
-      for (const p of l) if (p.scope === "user" || (p.scope === "project" && key(p.projectPath) === key(process.argv[1]))) console.log(p.id + " " + p.scope);
+      let l; try { l = JSON.parse(s); if (!Array.isArray(l)) throw 0; } catch (e) { process.exit(1); }
+      for (const p of l) if (p.scope === "user" || (p.scope === "project" && key(p.projectPath) === key(process.argv[1])) || /@claude-plugins-official$/.test(p.id)) console.log(p.id + " " + p.scope);
     });' "$projkey"
 }
-listing=$(installed)
+listing=$(installed) || stop "could not read the plugin list ($claude_bin plugin list --json)."
 case "$listing" in *mattpocock-skills@claude-plugins-official*)
   stop "Matt's skills are installed from the official marketplace. Remove that copy, then run this again: $claude_bin plugin uninstall mattpocock-skills@claude-plugins-official" ;;
 esac
