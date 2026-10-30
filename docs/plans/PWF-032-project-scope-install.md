@@ -40,6 +40,9 @@ Given a project whose `CLAUDE.md` has no "Workflow" heading (or no `CLAUDE.md` a
 **R7. The guard still guards adopted projects**
 Given a project whose `CLAUDE.md` has a "Workflow" heading, when an edit on the default branch or a plan-mode call reaches the guard, then it is blocked exactly as now (all existing guard cases still pass).
 
+**R9. This repo's own plugin settings are committed (added after approval, at Jason's request)**
+Given this repo, when the change is merged, then `.claude/settings.json` is tracked on trunk and holds exactly the entries the two project-scope installs write (`enabledPlugins` for `projectworkflow@projectworkflow` and `mattpocock-skills@projectworkflow`, both `true`); and given the two `claude plugin install ... --scope project` commands are then run in this repo, then `git status` shows no change to any tracked file and no new untracked file in the repo. (Those commands only add a record in your machine's own plugin settings, outside the repo.)
+
 **R8. The lock is unchanged**
 Given the lock's files, when this change is compared with trunk, then nothing under `githooks/` is different.
 
@@ -47,6 +50,7 @@ Given the lock's files, when this change is compared with trunk, then nothing un
 
 - R1 to R5: automated, in `test-adopt.sh`. The stand-in `claude` is extended to record the scope of each install and uninstall, and to report installs with their scope in `plugin list --json`.
 - R6, R7: automated, in `hooks/test-block-main-edits.sh` (new cases with and without a Workflow heading, plus all existing cases).
+- R9: checked by hand during `/code-change`: the file is created and committed, then the two install commands are run in this repo and `git status` is read. Manual, because it changes real plugin settings.
 - R8: automated as a manual-free check: `git diff trunk -- githooks` is empty, noted in the review record.
 - Not automated: that real Claude Code honours project scope and that `claude plugin list --json` has the shape the script expects. Manual check, because the tests use a stand-in `claude`. You run `adopt.sh` on a throwaway project (a new folder with `git init` and a minimal `CLAUDE.md` holding the Workflow lines), look at `claude plugin list`, then delete it. It runs from this repo's root after the change is merged, because the root is where `adopt.sh` and `release/` live together. The exact commands are in the review record.
 
@@ -61,7 +65,7 @@ Given the lock's files, when this change is compared with trunk, then nothing un
 
 - Any change to the lock, `githooks/`, or `install-trunk-lock.sh`.
 - Letting `adopt.sh` run on this repo.
-- Migrating this repo's own installs by script (done by hand, per above).
+- Migrating this repo's own installs by script (done by hand, per above). Only the settings file they write is committed (R9); `.claude/settings.local.json` stays ignored and untracked.
 - Changing the plugins' contents or Matt's pin.
 
 ## Check-in
